@@ -3,24 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OSCAR - RetailBot AR</title>
+  <title>OSCAR</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!--
-    The canvas where Three.js renders everything (video + 3D overlays).
-    Three.js will create its own canvas, so we just need a container.
-  -->
   <div id="app">
-    <!-- Video element: captures webcam (later: Quest passthrough) -->
     <video id="video-feed" autoplay playsinline></video>
-
-    <!-- Three.js will render its 3D canvas on top of the video -->
     <div id="three-container"></div>
 
-    <!-- Simple HUD overlay for status messages -->
+    <!-- HUD layer — all 2D interface elements -->
     <div id="hud">
-      <div id="status">Initialisation...</div>
+      <!-- Detection labels injected here by labelRenderer.js -->
+      <div id="labels"></div>
+
+      <!-- Top bar: system info -->
+      <div id="hud-top">
+        <span id="app-name">OSCAR</span>
+        <span id="detection-count">0 détections</span>
+      </div>
+
+      <!-- Bottom bar: status -->
+      <div id="hud-bottom">
+        <span id="status-dot"></span>
+        <span id="status">Initialisation...</span>
+      </div>
     </div>
   </div>
 

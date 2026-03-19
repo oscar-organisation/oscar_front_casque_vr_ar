@@ -1,68 +1,165 @@
 /* Reset */
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+:root {
+  --hud-font: 'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
+  --hud-bg: rgba(0, 0, 0, 0.5);
+  --hud-text: rgba(255, 255, 255, 0.85);
+  --hud-muted: rgba(255, 255, 255, 0.5);
+  --color-face: #4a9eff;
+  --color-product: #e0943a;
+  --color-ok: #3ddc84;
+  --color-error: #cf6679;
+}
+
 body {
   background: #000;
   overflow: hidden;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  color: #fff;
+  font-family: var(--hud-font);
+  color: var(--hud-text);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Main container — full viewport */
+/* ── Layers ── */
+
 #app {
   position: relative;
   width: 100vw;
   height: 100vh;
 }
 
-/* Video feed — fills the background */
 #video-feed {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   z-index: 1;
 }
 
-/* Three.js canvas — sits on top of video, transparent background */
 #three-container {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   z-index: 2;
   pointer-events: none;
 }
 
-/* HUD — status messages overlay */
 #hud {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   z-index: 3;
   pointer-events: none;
 }
 
-#status {
+/* ── Top bar ── */
+
+#hud-top {
   position: absolute;
-  bottom: 32px;
+  top: 16px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+}
+
+#app-name {
+  font-weight: 600;
+  color: var(--hud-text);
+}
+
+/* ── Bottom status bar ── */
+
+#hud-bottom {
+  position: absolute;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 10px 24px;
-  border-radius: 20px;
-  font-size: 14px;
-  letter-spacing: 0.5px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: opacity 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--hud-bg);
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: opacity 0.2s ease;
+}
+
+#status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-ok);
+  flex-shrink: 0;
+}
+
+#status-dot.error {
+  background: var(--color-error);
+}
+
+#status-dot.scanning {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Detection labels ── */
+
+#labels {
+  position: absolute;
+  inset: 0;
+}
+
+.detection-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.detection-label__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--hud-bg);
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.detection-label__tag--face {
+  border-left: 2px solid var(--color-face);
+}
+
+.detection-label__tag--product {
+  border-left: 2px solid var(--color-product);
+}
+
+.detection-label__name {
+  color: var(--hud-text);
+}
+
+.detection-label__confidence {
+  color: var(--hud-muted);
+  font-size: 10px;
 }
