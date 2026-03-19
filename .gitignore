@@ -1,6 +1,8 @@
 node_modules/
 dist/
 docs/api/
+docs/roadmap.md
+docs/user-stories.md
 .DS_Store
 *.local
 .env
