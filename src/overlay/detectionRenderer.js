@@ -1,17 +1,19 @@
-/** Maps detection API results to 3D overlays + 2D HUD labels */
+/** Maps detection API results to 3D overlays + 2D HUD labels + info panels */
 
 import { createBoundingBox, removeBoundingBox, clearOverlays } from './overlayEngine.js';
 import { setLabel, clearLabels, updateDetectionCount } from '../hud/labelRenderer.js';
+import { setInfoPanel, clearInfoPanels } from '../hud/infoPanel.js';
 import { OVERLAY } from '../config/constants.js';
 
 /**
- * Processes a batch of detections: renders bounding boxes and positioned labels.
+ * Processes a batch of detections: bounding boxes, labels, and info panels.
  * Clears previous frame before rendering.
  * @param {Array<Detection>} detections
  */
 export function renderDetections(detections) {
   clearOverlays();
   clearLabels();
+  clearInfoPanels();
 
   detections.forEach((detection) => {
     const color = detection.type === 'face' ? OVERLAY.FACE_COLOR : OVERLAY.PRODUCT_COLOR;
@@ -27,6 +29,7 @@ export function renderDetections(detections) {
     );
 
     setLabel(detection);
+    setInfoPanel(detection);
   });
 
   updateDetectionCount(detections.length);
@@ -47,6 +50,7 @@ export function renderSingleDetection(detection) {
   );
 
   setLabel(detection);
+  setInfoPanel(detection);
 }
 
 export function removeDetection(id) {
