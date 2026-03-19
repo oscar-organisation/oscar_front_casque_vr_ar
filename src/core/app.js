@@ -1,13 +1,12 @@
 /** Application core — initialization and render loop */
 
-import { initVideoStream } from '../capture/videoStream.js';
+import { initCaptureSource, getCaptureMode } from '../capture/captureSource.js';
 import { initOverlayEngine, render } from '../overlay/overlayEngine.js';
 import { renderDetections } from '../overlay/detectionRenderer.js';
 import { generateMockDetections } from '../services/mockDetection.js';
-import { setStatus } from '../hud/statusManager.js';
+import { setStatus, setCustomStatus } from '../hud/statusManager.js';
 import { throttle } from '../utils/throttle.js';
 
-let video = null;
 let isRunning = false;
 
 /** Throttled detection cycle — limits processing frequency */
@@ -21,14 +20,19 @@ const processDetections = throttle(() => {
 export async function startApp() {
   setStatus('INIT');
 
-  video = await initVideoStream();
+  const videoEl = document.getElementById('video-feed');
+  const { mode, video } = await initCaptureSource(videoEl);
+
   if (!video) {
     setStatus('ERROR_CAMERA');
     return;
   }
 
+  setCustomStatus(`source : ${mode}`);
   initOverlayEngine();
-  setStatus('SCANNING');
+
+  // Brief source indicator, then switch to scanning
+  setTimeout(() => setStatus('SCANNING'), 1500);
 
   isRunning = true;
   requestAnimationFrame(loop);
