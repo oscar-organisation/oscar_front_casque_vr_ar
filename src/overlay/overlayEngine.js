@@ -25,14 +25,32 @@ export function initOverlayEngine() {
   );
   camera.position.z = OVERLAY.Z_DEPTH;
 
-  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer = new THREE.WebGLRenderer({
+    alpha: true,
+    antialias: true,
+    powerPreference: 'high-performance',
+  });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
 
+  // Handle GPU context loss gracefully
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    console.warn('[Overlay] WebGL context lost — pausing render');
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    console.info('[Overlay] WebGL context restored');
+  });
+
   window.addEventListener('resize', handleResize);
 
   return { scene, camera, renderer };
+}
+
+/** Returns the Three.js renderer (needed for XR session binding) */
+export function getRenderer() {
+  return renderer;
 }
 
 /**
@@ -96,7 +114,25 @@ export function clearOverlays() {
 
 /** Renders the current frame */
 export function render() {
+  if (!renderer || renderer.getContext().isContextLost()) return;
   renderer.render(scene, camera);
+}
+
+/**
+ * Starts the XR render loop.
+ * Uses renderer.setAnimationLoop which is required for WebXR.
+ * @param {Function} onFrame - callback called each XR frame
+ */
+export function startXRRenderLoop(onFrame) {
+  renderer.setAnimationLoop((timestamp, xrFrame) => {
+    if (onFrame) onFrame(timestamp, xrFrame);
+    renderer.render(scene, camera);
+  });
+}
+
+/** Stops the XR render loop */
+export function stopXRRenderLoop() {
+  renderer.setAnimationLoop(null);
 }
 
 /** Returns the current overlay count (useful for HUD stats) */

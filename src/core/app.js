@@ -1,7 +1,7 @@
 /** Application core — initialization and render loop */
 
-import { initCaptureSource, getCaptureMode } from '../capture/captureSource.js';
-import { initOverlayEngine, render } from '../overlay/overlayEngine.js';
+import { initCaptureSource, getCaptureMode, startXRSession } from '../capture/captureSource.js';
+import { initOverlayEngine, getRenderer, render, startXRRenderLoop } from '../overlay/overlayEngine.js';
 import { renderDetections } from '../overlay/detectionRenderer.js';
 import { generateMockDetections } from '../services/mockDetection.js';
 import { setStatus, setCustomStatus } from '../hud/statusManager.js';
@@ -28,8 +28,38 @@ export async function startApp() {
     return;
   }
 
-  setCustomStatus(`source : ${mode}`);
-  initOverlayEngine();
+  setCustomStatus(`source :: ${mode === 'webxr' ? 'webcam (AR disponible)' : 'webcam'}`);
+  const { renderer } = initOverlayEngine();
+
+  // Wire up the AR button if WebXR is available
+  const arButton = document.getElementById('enter-ar');
+  if (arButton && mode === 'webxr') {
+    arButton.addEventListener('click', async () => {
+      arButton.textContent = 'Lancement...';
+      arButton.disabled = true;
+
+      const session = await startXRSession(renderer);
+      if (session) {
+        setCustomStatus('source :: passthrough AR');
+
+        // Switch to XR render loop
+        isRunning = false;
+        startXRRenderLoop((timestamp, xrFrame) => {
+          processDetections();
+        });
+
+        session.addEventListener('end', () => {
+          setCustomStatus('source :: webcam');
+          isRunning = true;
+          requestAnimationFrame(loop);
+        });
+      } else {
+        arButton.textContent = 'Entrer en AR';
+        arButton.disabled = false;
+        setCustomStatus('source :: webcam (AR échoué)');
+      }
+    });
+  }
 
   // Brief source indicator, then switch to scanning
   setTimeout(() => setStatus('SCANNING'), 1500);
