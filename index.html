@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="app">
-    <video id="video-feed" autoplay playsinline></video>
+    <video id="video-feed" autoplay playsinline muted></video>
     <div id="three-container"></div>
 
     <!-- HUD layer — all 2D interface elements -->
@@ -21,6 +21,9 @@
         <span id="app-name">OSCAR</span>
         <span id="detection-count">0 détections</span>
       </div>
+
+      <!-- AR entry button — shown only when WebXR is available -->
+      <button id="enter-ar" style="display:none;">Entrer en AR</button>
 
       <!-- Bottom bar: status -->
       <div id="hud-bottom">
