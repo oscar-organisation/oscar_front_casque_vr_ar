@@ -1,19 +1,15 @@
 /** Application-wide constants and configuration */
 
 export const APP = {
-  NAME: 'O.S.C.A.R.',
-  VERSION: '0.1.0',
-};
-
-export const CAMERA = {
-  WIDTH: 1920,
-  HEIGHT: 1080,
-  FACING_MODE: 'environment',
+  NAME: 'OSCAR',
+  FULL_NAME: 'O.S.C.A.R.',
+  VERSION: '0.2.0',
+  CODENAME: 'RETAIL-BOT',
 };
 
 export const OVERLAY = {
-  DEFAULT_COLOR: 0x00ff88,
-  FACE_COLOR: 0x00aaff,
+  DEFAULT_COLOR: 0x00f0ff,
+  FACE_COLOR: 0x4a9eff,
   PRODUCT_COLOR: 0xffaa00,
   FILL_OPACITY: 0.08,
   BORDER_WIDTH: 2,
@@ -23,10 +19,21 @@ export const OVERLAY = {
 export const HUD = {
   FADE_DURATION: 300,
   STATUS_TIMEOUT: 3000,
+  TELEMETRY_REFRESH_MS: 1000,
+  METRICS_REFRESH_MS: 1000,
 };
 
 export const API = {
   MIMICX_ENDPOINT: 'https://model.mimicx.ai/api/v1/predict',
   WS_RECONNECT_DELAY: 2000,
   WS_MAX_RETRIES: 5,
+};
+
+export const LIVEKIT = {
+  URL: import.meta.env.VITE_LIVEKIT_URL || '',
+  ROOM: import.meta.env.VITE_LIVEKIT_ROOM || 'oscar-lot1-room',
+  TOKEN: import.meta.env.VITE_LIVEKIT_TOKEN || '',
+  AUTO_SUBSCRIBE: true,
+  ADAPTIVE_STREAM: true,
+  DYNACAST: true,
 };

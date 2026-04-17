@@ -1,68 +1,67 @@
 /** Application core — initialization and render loop */
 
-import { initCaptureSource, getCaptureMode, startXRSession } from '../capture/captureSource.js';
-import { initOverlayEngine, getRenderer, render, startXRRenderLoop } from '../overlay/overlayEngine.js';
+import { initCaptureSource } from '../capture/captureSource.js';
+import { onStateChange, ConnectionState } from '../capture/livekitStream.js';
+import { initOverlayEngine, render } from '../overlay/overlayEngine.js';
 import { renderDetections } from '../overlay/detectionRenderer.js';
 import { generateMockDetections } from '../services/mockDetection.js';
-import { setStatus, setCustomStatus } from '../hud/statusManager.js';
+import { setStatus } from '../hud/statusManager.js';
+import { startClock } from '../hud/clockModule.js';
+import { startRobotTelemetry } from '../hud/robotTelemetry.js';
+import { startConnectionMetrics } from '../hud/connectionMetrics.js';
+import { initMicButton } from '../hud/micButton.js';
 import { throttle } from '../utils/throttle.js';
 
 let isRunning = false;
+let detectionsActive = false;
 
-/** Throttled detection cycle — limits processing frequency */
 const processDetections = throttle(() => {
+  if (!detectionsActive) return;
   const detections = generateMockDetections(1, 2);
   renderDetections(detections);
-  setStatus('DETECTED');
 }, 2000);
 
-/** Initializes all subsystems and starts the render loop */
 export async function startApp() {
   setStatus('INIT');
+  startClock();
+  startRobotTelemetry();
+  startConnectionMetrics();
+  initMicButton();
+
+  initOverlayEngine();
 
   const videoEl = document.getElementById('video-feed');
-  const { mode, video } = await initCaptureSource(videoEl);
+  const audioEl = document.getElementById('audio-feed');
+
+  setStatus('CONNECTING');
+  const { mode, video } = await initCaptureSource(videoEl, audioEl);
 
   if (!video) {
-    setStatus('ERROR_CAMERA');
+    setStatus('ERROR_CONNECTION');
     return;
   }
 
-  setCustomStatus(`source :: ${mode === 'webxr' ? 'webcam (AR disponible)' : 'webcam'}`);
-  const { renderer } = initOverlayEngine();
-
-  // Wire up the AR button if WebXR is available
-  const arButton = document.getElementById('enter-ar');
-  if (arButton && mode === 'webxr') {
-    arButton.addEventListener('click', async () => {
-      arButton.textContent = 'Lancement...';
-      arButton.disabled = true;
-
-      const session = await startXRSession(renderer);
-      if (session) {
-        setCustomStatus('source :: passthrough AR');
-
-        // Switch to XR render loop
-        isRunning = false;
-        startXRRenderLoop((timestamp, xrFrame) => {
-          processDetections();
-        });
-
-        session.addEventListener('end', () => {
-          setCustomStatus('source :: webcam');
-          isRunning = true;
-          requestAnimationFrame(loop);
-        });
+  onStateChange((state) => {
+    if (state.connectionState === ConnectionState.Connected) {
+      if (state.hasVideo) {
+        if (!detectionsActive) {
+          detectionsActive = true;
+          setTimeout(() => setStatus('SCANNING'), 1500);
+        }
+        setStatus('STREAMING');
       } else {
-        arButton.textContent = 'Entrer en AR';
-        arButton.disabled = false;
-        setCustomStatus('source :: webcam (AR échoué)');
+        detectionsActive = false;
+        setStatus('WAITING_FOR_STREAM');
       }
-    });
-  }
-
-  // Brief source indicator, then switch to scanning
-  setTimeout(() => setStatus('SCANNING'), 1500);
+    } else if (state.connectionState === ConnectionState.Connecting) {
+      setStatus('CONNECTING');
+    } else if (state.connectionState === ConnectionState.Reconnecting) {
+      setStatus('RECONNECTING');
+    } else if (state.connectionState === ConnectionState.Disconnected) {
+      detectionsActive = false;
+      setStatus('DISCONNECTED');
+    }
+  });
 
   isRunning = true;
   requestAnimationFrame(loop);
@@ -70,7 +69,6 @@ export async function startApp() {
 
 function loop() {
   if (!isRunning) return;
-
   processDetections();
   render();
   requestAnimationFrame(loop);
