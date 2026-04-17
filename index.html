@@ -2,37 +2,144 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OSCAR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <title>OSCAR · Téléopération</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="app">
     <video id="video-feed" autoplay playsinline muted></video>
+    <audio id="audio-feed" autoplay></audio>
     <div id="three-container"></div>
 
-    <!-- HUD layer — all 2D interface elements -->
     <div id="hud">
-      <!-- Detection labels injected here by labelRenderer.js -->
+
+      <span class="corner corner--tl"></span>
+      <span class="corner corner--tr"></span>
+      <span class="corner corner--bl"></span>
+      <span class="corner corner--br"></span>
+
+      <div class="reticle">
+        <span class="reticle__crosshair"></span>
+        <span class="reticle__ring"></span>
+      </div>
+
       <div id="labels"></div>
 
-      <!-- Top bar: system info -->
-      <div id="hud-top">
-        <span id="app-name">OSCAR</span>
-        <span id="detection-count">0 détections</span>
-      </div>
+      <header class="panel panel--tl">
+        <div class="panel__bar">
+          <span class="panel__dot"></span>
+          <span class="panel__title">OSCAR</span>
+          <span class="panel__sub">RETAIL-BOT v0.2</span>
+        </div>
+        <div class="panel__line">
+          <span class="k">OPÉRATEUR</span>
+          <span class="v" id="metrics-identity">—</span>
+        </div>
+        <div class="panel__line">
+          <span class="k">SESSION</span>
+          <span class="v" id="hud-uptime">00:00:00</span>
+        </div>
+        <div class="panel__line">
+          <span class="k">SOURCE</span>
+          <span class="v" id="metrics-publisher">—</span>
+        </div>
+      </header>
 
-      <!-- AR entry button — shown only when WebXR is available -->
-      <button id="enter-ar" style="display:none;">Entrer en AR</button>
+      <header class="panel panel--tr">
+        <div class="panel__time" id="hud-time">--:--:--</div>
+        <div class="panel__date" id="hud-date">— —</div>
+        <div class="panel__line">
+          <span class="k">DÉTECTIONS</span>
+          <span class="v" id="detection-count">0</span>
+        </div>
+      </header>
 
-      <!-- Bottom bar: status -->
-      <div id="hud-bottom">
-        <span id="status-dot"></span>
-        <span id="status">Initialisation...</span>
+      <section class="panel panel--bl">
+        <div class="panel__bar">
+          <span class="panel__title">TÉLÉMÉTRIE ROBOT</span>
+          <span class="panel__sub" id="telemetry-mode">TÉLÉOPÉRATION</span>
+        </div>
+
+        <div class="telemetry-row">
+          <span class="k">BATTERIE</span>
+          <div class="bar"><div class="bar__fill" id="telemetry-battery-bar"></div></div>
+          <span class="v" id="telemetry-battery">—</span>
+        </div>
+
+        <div class="telemetry-row">
+          <span class="k">SIGNAL</span>
+          <div class="signal" id="telemetry-signal" data-bars="4">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <span class="v">5G</span>
+        </div>
+
+        <div class="telemetry-row">
+          <span class="k">TEMP. CPU</span>
+          <span class="v" id="telemetry-temp">—</span>
+        </div>
+
+        <div class="telemetry-row">
+          <span class="k">POSITION</span>
+          <span class="v" id="telemetry-location">—</span>
+        </div>
+      </section>
+
+      <section class="panel panel--br">
+        <div class="panel__bar">
+          <span class="panel__title">FLUX TEMPS RÉEL</span>
+          <span class="panel__sub" id="metrics-state" data-conn-state="0">OFFLINE</span>
+        </div>
+
+        <div class="telemetry-row">
+          <span class="k">QUALITÉ</span>
+          <span class="v" id="metrics-quality" data-quality="0">—</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="k">RÉSOLUTION</span>
+          <span class="v" id="metrics-resolution">—</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="k">FRÉQUENCE</span>
+          <span class="v" id="metrics-fps">—</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="k">DÉBIT</span>
+          <span class="v" id="metrics-bitrate">—</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="k">PARTICIPANTS</span>
+          <span class="v" id="metrics-participants">0</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="k">ROOM</span>
+          <span class="v" id="metrics-room">—</span>
+        </div>
+      </section>
+
+      <div class="bottom-center">
+        <div id="hud-bottom">
+          <span id="status-dot"></span>
+          <span id="status">Initialisation...</span>
+        </div>
+        <button id="mic-button" type="button" data-active="off" aria-label="Activer le microphone">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          <span id="mic-button-label">MIC</span>
+        </button>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/main.js"></script>
+  </div>
 </body>
 </html>

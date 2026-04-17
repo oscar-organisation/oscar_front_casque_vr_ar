@@ -7,3 +7,9 @@ docs/figma-links.md
 .DS_Store
 *.local
 .env
+
+# Design inspiration screenshots — local only
+Exemple*.jpeg
+Exemple*.jpg
+Exemple*.png
+.vercel

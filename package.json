@@ -10,10 +10,11 @@
     "docs:serve": "npx docsify-cli serve docs --port 3000"
   },
   "dependencies": {
+    "livekit-client": "^2.18.3",
     "three": "^0.172.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-basic-ssl": "^2.2.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "jsdoc": "^4.0.5",
     "vite": "^6.2.0"
   }

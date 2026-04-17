@@ -5,16 +5,19 @@ const dotEl = document.getElementById('status-dot');
 
 const STATUS = {
   INIT: 'initialisation...',
-  CAMERA_ACTIVE: 'flux caméra actif',
-  SCANNING: 'analyse en cours...',
+  CONNECTING: 'connexion au robot...',
+  WAITING_FOR_STREAM: 'en attente du flux robot...',
+  STREAMING: 'flux robot actif',
+  SCANNING: 'analyse de la scène...',
   DETECTED: 'détection active',
-  ERROR_CAMERA: 'erreur : accès caméra refusé',
+  RECONNECTING: 'reconnexion en cours...',
+  ERROR_CONNECTION: 'erreur : connexion perdue',
   ERROR_API: 'erreur : connexion API perdue',
-  DISCONNECTED: 'déconnecté',
+  DISCONNECTED: 'déconnecté du robot',
 };
 
-const ERROR_STATES = ['ERROR_CAMERA', 'ERROR_API', 'DISCONNECTED'];
-const SCANNING_STATES = ['SCANNING', 'INIT'];
+const ERROR_STATES = ['ERROR_CONNECTION', 'ERROR_API', 'DISCONNECTED'];
+const SCANNING_STATES = ['SCANNING', 'INIT', 'CONNECTING', 'WAITING_FOR_STREAM', 'RECONNECTING'];
 
 let fadeTimer = null;
 
@@ -24,7 +27,6 @@ export function setStatus(key) {
 
   statusEl.textContent = STATUS[key];
 
-  // Dot reflects system health
   dotEl.classList.toggle('error', ERROR_STATES.includes(key));
   dotEl.classList.toggle('scanning', SCANNING_STATES.includes(key));
 }
