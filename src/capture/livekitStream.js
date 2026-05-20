@@ -45,6 +45,8 @@ const state = {
   participantIdentity: null,
   joinedAt: null,
   activePublisher: null,
+  activePublisherMetadata: null,
+  activeTrackName: null,
   micPublishing: false,
 };
 
@@ -138,11 +140,16 @@ function attachBestVideo() {
 
   state.hasVideo = true;
   state.activePublisher = pick.participant.identity;
+  state.activePublisherMetadata = pick.participant.metadata ?? null;
+  state.activeTrackName = pick.publication.trackName ?? pick.publication.track.name ?? null;
   const dim = pick.publication.track.dimensions;
   if (dim) {
     state.videoWidth = dim.width;
     state.videoHeight = dim.height;
   }
+  console.info(
+    `[LiveKit] attached track from ${pick.participant.identity} — metadata=${pick.participant.metadata || '(none)'} track=${state.activeTrackName} dims=${state.videoWidth}×${state.videoHeight}`
+  );
   notify();
 }
 
@@ -227,6 +234,12 @@ function attachRoomEvents() {
     .on(RoomEvent.ParticipantConnected, () => {
       state.participantsCount = room.numParticipants;
       notify();
+    })
+    .on(RoomEvent.ParticipantMetadataChanged, (_, participant) => {
+      if (participant?.identity === state.activePublisher) {
+        state.activePublisherMetadata = participant.metadata ?? null;
+        notify();
+      }
     })
     .on(RoomEvent.ParticipantDisconnected, () => {
       state.participantsCount = room.numParticipants;

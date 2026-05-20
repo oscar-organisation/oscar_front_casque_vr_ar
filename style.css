@@ -58,6 +58,7 @@ html, body {
   overflow: hidden;
 }
 
+/* Default desktop flat view: the <video> fills the viewport directly. */
 #video-feed {
   position: absolute;
   inset: 0;
@@ -72,12 +73,74 @@ html, body {
   display: none;
 }
 
+/* WebGL canvas (cinema plane or 360 sphere) — dormant until the user
+   presses ENTER VR. Brought forward only while an XR session is active. */
+#xr-container {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+#xr-container.xr-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 4;  /* above the video so headset sees the rendered scene */
+}
+#xr-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Hide the 2D overlay & HUD while in immersive VR (Quest renders the XR scene directly) */
+body.xr-active #three-container,
+body.xr-active #hud {
+  display: none;
+}
+
+/* 2D detection overlay sits above the video but below the HUD */
 #three-container {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
 }
+
+/* VR toggle button — same pill style as the mic */
+#vr-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background: var(--glass-bg-strong);
+  border: var(--glass-border-soft);
+  border-radius: var(--r-pill);
+  color: var(--c-text);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  box-shadow: var(--glass-shadow);
+  transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease;
+}
+#vr-button:hover { background: rgba(255, 255, 255, 0.20); transform: translateY(-1px); }
+#vr-button:active { transform: translateY(0); }
+#vr-button[data-active="on"] {
+  background: rgba(147, 197, 253, 0.25);
+  border-color: rgba(147, 197, 253, 0.70);
+  color: #dbeafe;
+  box-shadow: 0 0 24px rgba(147, 197, 253, 0.35), var(--glass-shadow);
+}
+#vr-button:disabled { opacity: 0.5; cursor: wait; }
+#vr-button[hidden] { display: none; }
 
 #hud {
   position: absolute;
