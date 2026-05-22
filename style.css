@@ -227,6 +227,13 @@ body.xr-active #hud {
 .panel--tr { top: 40px; right: 40px; min-width: 220px; text-align: right; }
 .panel--bl { bottom: 50px; left: 40px; min-width: 300px; }
 .panel--br { bottom: 50px; right: 40px; min-width: 300px; }
+.panel--teleop {
+  top: 40px;
+  left: 50%;
+  width: min(520px, max(360px, calc(100vw - 760px)));
+  min-width: 360px;
+  transform: translateX(-50%);
+}
 
 .panel__bar {
   display: flex;
@@ -316,6 +323,22 @@ body.xr-active #hud {
   font-size: 11px;
 }
 .telemetry-row .v { text-align: right; white-space: nowrap; }
+
+.teleop-grid {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 6px 12px;
+  align-items: baseline;
+}
+.teleop-grid .v {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(225, 245, 255, 0.92);
+}
+[data-xr-published="1"] { color: var(--c-ok); }
+[data-xr-published="0"] { color: var(--c-warn); }
 
 .bar {
   position: relative;
@@ -525,6 +548,25 @@ body.xr-active #hud {
 
 @media (max-width: 900px) {
   .panel { min-width: 200px; max-width: 260px; padding: 12px 14px 10px; font-size: 11px; }
+  .panel--teleop {
+    display: block;
+    top: 120px;
+    left: 50%;
+    width: min(420px, calc(100vw - 28px));
+    min-width: 0;
+    max-width: none;
+    padding: 10px 12px;
+  }
+  .panel--teleop .panel__bar {
+    padding-bottom: 7px;
+    margin-bottom: 7px;
+  }
+  .teleop-grid {
+    grid-template-columns: 74px minmax(0, 1fr);
+    gap: 4px 8px;
+  }
+  .teleop-grid .k { font-size: 8px; }
+  .teleop-grid .v { font-size: 9px; }
   .panel__title { font-size: 12px; }
   .panel__time { font-size: 24px; }
   .telemetry-row { grid-template-columns: 76px 1fr auto; gap: 10px; font-size: 10px; }

@@ -13,9 +13,23 @@
  */
 
 import * as THREE from 'three';
-import { PROJECTION } from '../capture/streamProjection.js';
+import {
+  detectProjectionDetails,
+  PROJECTION,
+  shouldForceEquirect,
+  shouldRequireEquirectInVR,
+} from '../capture/streamProjection.js';
+import { onXRInputPacket, publishXRInputFrame } from '../teleoperation/xrInputPublisher.js';
+import { setStatus } from '../hud/statusManager.js';
 
 const CONTAINER_ID = 'xr-container';
+const VIEWER_HEIGHT = 1.6;
+const VIDEO_SPHERE_RADIUS = 50;
+const XR_HUD_RADIUS = VIDEO_SPHERE_RADIUS - 0.85;
+const XR_HUD_PANEL_WIDTH = 7.2;
+const XR_HUD_PANEL_HEIGHT = 3.6;
+const XR_INPUT_PANEL_WIDTH = 1.7;
+const XR_INPUT_PANEL_HEIGHT = 1.06;
 
 let renderer = null;
 let scene = null;
@@ -25,7 +39,15 @@ let videoTexture = null;
 let container = null;
 
 let displayMesh = null;
+let detectionGroup = null;
+const detectionMeshes = new Map();
+let xrInputPanel = null;
+let xrInputPanelCanvas = null;
+let xrInputPanelCtx = null;
+let xrInputPanelTexture = null;
+let lastXRInputPanelDraw = 0;
 let currentMode = null;
+let currentProjection = null;
 let vrSupported = false;
 let lastLiveKitState = null;
 
@@ -48,7 +70,10 @@ export async function initXRScene(sourceVideoEl) {
   scene.background = new THREE.Color(0x000000);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 1.6, 0);
+  camera.position.set(0, VIEWER_HEIGHT, 0);
+  scene.add(camera);
+  initXRInputDebugPanel();
+  onXRInputPacket(updateXRInputDebugPanel);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -61,8 +86,9 @@ export async function initXRScene(sourceVideoEl) {
   videoTexture.minFilter = THREE.LinearFilter;
   videoTexture.magFilter = THREE.LinearFilter;
 
-  // Default projection, will be refreshed on stream updates
-  buildForMode(PROJECTION.FLAT);
+  // Default projection, will be refreshed on stream updates.
+  // During headset tests, ?force360=1 starts directly inside the sphere.
+  buildForMode(shouldForceEquirect() ? PROJECTION.EQUIRECT : PROJECTION.FLAT);
 
   // Re-run detection whenever the <video> first reports its dimensions —
   // LiveKit's track dimensions property is often 0 during initial subscribe.
@@ -85,16 +111,28 @@ export async function initXRScene(sourceVideoEl) {
   renderer.xr.addEventListener('sessionstart', () => {
     container.classList.add('xr-active');
     document.body.classList.add('xr-active');
+    forceSphereForImmersiveSession();
+    showXRDetections(true);
+    showXRInputDebugPanel(true);
     notify({ presenting: true });
   });
   renderer.xr.addEventListener('sessionend', () => {
     container.classList.remove('xr-active');
     document.body.classList.remove('xr-active');
+    showXRDetections(false);
+    showXRInputDebugPanel(false);
     notify({ presenting: false });
   });
 
-  renderer.setAnimationLoop(() => {
-    if (renderer.xr.isPresenting) renderer.render(scene, camera);
+  renderer.setAnimationLoop((timestamp, frame) => {
+    if (!renderer.xr.isPresenting) return;
+
+    const referenceSpace = renderer.xr.getReferenceSpace();
+    if (frame && referenceSpace) {
+      publishXRInputFrame(timestamp, frame, referenceSpace);
+    }
+
+    renderer.render(scene, camera);
   });
 
   // Feature detection — some browsers lack navigator.xr entirely
@@ -112,7 +150,7 @@ export async function initXRScene(sourceVideoEl) {
 export function onStreamUpdate(liveKitState) {
   if (!scene) return;
   lastLiveKitState = liveKitState;
-  const mode = detectModeFromState(liveKitState);
+  const mode = renderer?.xr?.isPresenting ? PROJECTION.EQUIRECT : detectModeFromState(liveKitState);
   if (mode !== currentMode) buildForMode(mode);
 }
 
@@ -123,7 +161,14 @@ export async function enterVR() {
     return;
   }
   if (renderer.xr.isPresenting) return;
+  if (shouldRequireEquirectInVR() && currentMode !== PROJECTION.EQUIRECT) {
+    setStatus('ERROR_NON_IMMERSIVE');
+    const reason = currentProjection?.reason || 'flux non déclaré comme 360';
+    alert(`Flux non immersif : vidéo 360 requise.\n\nRaison : ${reason}`);
+    return;
+  }
   try {
+    forceSphereForImmersiveSession();
     const session = await navigator.xr.requestSession('immersive-vr', {
       optionalFeatures: ['local-floor', 'bounded-floor'],
     });
@@ -145,6 +190,37 @@ export function getProjectionMode() {
   return currentMode;
 }
 
+export function getProjectionInfo() {
+  return currentProjection ? { ...currentProjection } : null;
+}
+
+export function renderXRDetections(detections) {
+  const group = getOrCreateDetectionGroup();
+  clearXRDetections();
+
+  detections.forEach((detection) => {
+    const mesh = createDetectionPanel(detection);
+    const anchor = screenDetectionToSphereAnchor(detection);
+    mesh.position.copy(anchor);
+    mesh.lookAt(0, VIEWER_HEIGHT, 0);
+    mesh.rotateY(Math.PI);
+    group.add(mesh);
+    detectionMeshes.set(detection.id, mesh);
+  });
+}
+
+export function clearXRDetections() {
+  for (const mesh of detectionMeshes.values()) {
+    detectionGroup?.remove(mesh);
+    mesh.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material?.map) child.material.map.dispose();
+      if (child.material) child.material.dispose();
+    });
+  }
+  detectionMeshes.clear();
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Internals
    ═══════════════════════════════════════════════════════════════ */
@@ -153,56 +229,42 @@ function notify(partial) {
   const snap = {
     supported: vrSupported,
     presenting: !!renderer?.xr?.isPresenting,
+    projection: currentProjection,
     ...partial,
   };
   for (const cb of listeners) cb(snap);
 }
 
 function detectModeFromState(liveKitState) {
-  // Priority 1 — explicit publisher metadata
-  const { activePublisherMetadata, activeTrackName } = liveKitState;
-  if (activePublisherMetadata) {
-    try {
-      const parsed = JSON.parse(activePublisherMetadata);
-      if (parsed?.projection === PROJECTION.EQUIRECT) {
-        console.info('[XR] projection=equirect from metadata');
-        return PROJECTION.EQUIRECT;
-      }
-      if (parsed?.projection === PROJECTION.FLAT) {
-        console.info('[XR] projection=flat from metadata');
-        return PROJECTION.FLAT;
-      }
-    } catch (e) {
-      console.warn('[XR] metadata JSON parse failed:', activePublisherMetadata);
-    }
-  }
+  const projection = detectProjectionDetails({
+    metadata: liveKitState.activePublisherMetadata,
+    trackName: liveKitState.activeTrackName,
+    width: liveKitState.videoWidth || videoEl?.videoWidth || 0,
+    height: liveKitState.videoHeight || videoEl?.videoHeight || 0,
+  });
 
-  // Priority 2 — track name hint
-  if (activeTrackName && /360|equirect|pano/i.test(activeTrackName)) {
-    console.info('[XR] projection=equirect from track name');
-    return PROJECTION.EQUIRECT;
-  }
-
-  // Priority 3 — aspect ratio heuristic. Prefer the live <video> dimensions
-  // since LiveKit's publication dims can be stale or 0 at first notify.
-  let width  = liveKitState.videoWidth  || videoEl?.videoWidth  || 0;
-  let height = liveKitState.videoHeight || videoEl?.videoHeight || 0;
-  if (width && height) {
-    const ratio = width / height;
-    console.info(`[XR] ratio detection: ${width}×${height} = ${ratio.toFixed(3)}`);
-    if (ratio >= 1.85 && ratio <= 2.15) return PROJECTION.EQUIRECT;
-  }
-
-  console.info('[XR] falling back to flat (no metadata, no matching ratio)');
-  return PROJECTION.FLAT;
+  console.info(`[XR] projection detected → ${projection.mode} (${projection.source}: ${projection.reason})`);
+  currentProjection = projection;
+  notify({ projection });
+  return projection.mode;
 }
 
 function buildForMode(mode) {
   removeCurrentMesh();
   currentMode = mode;
+  if (!currentProjection || currentProjection.mode !== mode) {
+    currentProjection = {
+      mode,
+      source: shouldForceEquirect() ? 'forced' : 'initial',
+      reason: shouldForceEquirect() ? 'forced by test override' : 'initial render mode before stream metadata',
+      confidence: shouldForceEquirect() ? 'explicit' : 'fallback',
+    };
+  }
   displayMesh = mode === PROJECTION.EQUIRECT ? buildSphere() : buildCinemaScreen();
+  displayMesh.userData.projection = mode;
   scene.add(displayMesh);
   console.info(`[XR] projection → ${mode}`);
+  notify({ projection: currentProjection });
 }
 
 function removeCurrentMesh() {
@@ -216,15 +278,16 @@ function removeCurrentMesh() {
 }
 
 function buildSphere() {
-  const geometry = new THREE.SphereGeometry(50, 64, 40);
+  const geometry = new THREE.SphereGeometry(VIDEO_SPHERE_RADIUS, 64, 40);
   geometry.scale(-1, 1, 1);
   const material = new THREE.MeshBasicMaterial({
     map: videoTexture,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
     toneMapped: false,
   });
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(0, 1.6, 0);
+  mesh.position.set(0, VIEWER_HEIGHT, 0);
+  mesh.rotation.y = Math.PI;
   return mesh;
 }
 
@@ -278,4 +341,291 @@ function onResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function forceSphereForImmersiveSession() {
+  if (currentMode === PROJECTION.EQUIRECT && displayMesh?.userData?.projection === PROJECTION.EQUIRECT) return;
+  currentProjection = {
+    mode: PROJECTION.EQUIRECT,
+    source: 'forced',
+    reason: 'immersive VR sessions always use spherical wrap',
+    confidence: 'explicit',
+  };
+  buildForMode(PROJECTION.EQUIRECT);
+}
+
+function showXRDetections(visible) {
+  const group = getOrCreateDetectionGroup();
+  group.visible = visible;
+}
+
+function getOrCreateDetectionGroup() {
+  if (detectionGroup) return detectionGroup;
+  detectionGroup = new THREE.Group();
+  detectionGroup.visible = false;
+  scene.add(detectionGroup);
+  return detectionGroup;
+}
+
+function initXRInputDebugPanel() {
+  xrInputPanelCanvas = document.createElement('canvas');
+  xrInputPanelCanvas.width = 1024;
+  xrInputPanelCanvas.height = 640;
+  xrInputPanelCtx = xrInputPanelCanvas.getContext('2d');
+
+  xrInputPanelTexture = new THREE.CanvasTexture(xrInputPanelCanvas);
+  xrInputPanelTexture.colorSpace = THREE.SRGBColorSpace;
+  xrInputPanelTexture.minFilter = THREE.LinearFilter;
+  xrInputPanelTexture.magFilter = THREE.LinearFilter;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: xrInputPanelTexture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+
+  xrInputPanel = new THREE.Mesh(new THREE.PlaneGeometry(XR_INPUT_PANEL_WIDTH, XR_INPUT_PANEL_HEIGHT), material);
+  xrInputPanel.position.set(0.25, -0.18, -2.65);
+  xrInputPanel.rotation.set(THREE.MathUtils.degToRad(-3), THREE.MathUtils.degToRad(-8), 0);
+  xrInputPanel.renderOrder = 2500;
+  xrInputPanel.visible = false;
+  camera.add(xrInputPanel);
+
+  drawXRInputDebugPanel(null);
+}
+
+function showXRInputDebugPanel(visible) {
+  if (xrInputPanel) xrInputPanel.visible = visible;
+}
+
+function updateXRInputDebugPanel(snapshot) {
+  const now = performance.now();
+  if (now - lastXRInputPanelDraw < 110) return;
+  lastXRInputPanelDraw = now;
+  drawXRInputDebugPanel(snapshot);
+}
+
+function drawXRInputDebugPanel(snapshot) {
+  if (!xrInputPanelCtx || !xrInputPanelTexture) return;
+  const ctx = xrInputPanelCtx;
+  const w = xrInputPanelCanvas.width;
+  const h = xrInputPanelCanvas.height;
+  const summary = snapshot?.summary;
+  const left = summary ? findXRController(summary.controllers, 'left') : null;
+  const right = summary ? findXRController(summary.controllers, 'right') : null;
+
+  ctx.clearRect(0, 0, w, h);
+  drawXRRoundRect(ctx, 0, 0, w, h, 34);
+  ctx.fillStyle = 'rgba(3, 8, 13, 0.78)';
+  ctx.fill();
+  ctx.strokeStyle = snapshot?.published ? 'rgba(74, 222, 128, 0.95)' : 'rgba(251, 191, 36, 0.9)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.fillStyle = snapshot?.published ? '#86efac' : '#fbbf24';
+  ctx.fillRect(38, 38, 10, 72);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+  ctx.font = '700 40px Rajdhani, Arial, sans-serif';
+  ctx.fillText('TX CASQUE > LIVEKIT', 66, 70);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.58)';
+  ctx.font = '700 22px JetBrains Mono, monospace';
+  ctx.fillText(snapshot?.topic || 'oscar.xr.input', 66, 108);
+
+  ctx.fillStyle = snapshot?.published ? '#86efac' : '#fbbf24';
+  ctx.textAlign = 'right';
+  ctx.fillText(snapshot?.published ? 'TRANSMIS' : 'EN ATTENTE ROOM', w - 42, 72);
+  ctx.textAlign = 'left';
+
+  drawXRMetric(ctx, 66, 160, 'SEQ', summary ? `#${summary.seq}` : '--');
+  drawXRMetric(ctx, 260, 160, 'CADENCE', snapshot ? `${snapshot.publishHz} Hz` : '--');
+  drawXRMetric(ctx, 510, 160, 'MODE', snapshot ? 'LOW LATENCY' : '--');
+
+  drawXRSection(ctx, 66, 236, 'TÊTE', [
+    ['pos', formatXRVector(summary?.head?.position, 'm')],
+    ['rot', formatXRRotation(summary?.head?.rotationDeg)],
+  ]);
+
+  drawXRSection(ctx, 66, 370, 'MAIN GAUCHE', [
+    ['axes', formatXRAxes(left?.axes)],
+    ['btns', formatXRButtons(left?.buttons)],
+    ['grip', formatXRVector(left?.grip?.position, 'm')],
+  ]);
+
+  drawXRSection(ctx, 544, 370, 'MAIN DROITE', [
+    ['axes', formatXRAxes(right?.axes)],
+    ['btns', formatXRButtons(right?.buttons)],
+    ['grip', formatXRVector(right?.grip?.position, 'm')],
+  ]);
+
+  xrInputPanelTexture.needsUpdate = true;
+}
+
+function drawXRMetric(ctx, x, y, label, value) {
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
+  ctx.font = '700 20px JetBrains Mono, monospace';
+  ctx.fillText(label, x, y);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+  ctx.font = '700 30px JetBrains Mono, monospace';
+  ctx.fillText(value, x, y + 38);
+}
+
+function drawXRSection(ctx, x, y, title, rows) {
+  ctx.fillStyle = 'rgba(147, 197, 253, 0.92)';
+  ctx.font = '700 24px Rajdhani, Arial, sans-serif';
+  ctx.fillText(title, x, y);
+
+  let cursorY = y + 38;
+  rows.forEach(([key, value]) => {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
+    ctx.font = '700 18px JetBrains Mono, monospace';
+    ctx.fillText(key.toUpperCase(), x, cursorY);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.font = '500 21px JetBrains Mono, monospace';
+    fitText(ctx, value, x + 82, cursorY, 360);
+    cursorY += 38;
+  });
+}
+
+function findXRController(controllers, hand) {
+  return controllers.find((controller) => controller.hand === hand)
+    || controllers.find((controller) => controller.hand === 'none')
+    || null;
+}
+
+function formatXRVector(vector, suffix = '') {
+  if (!vector) return '--';
+  return `x ${formatXRNumber(vector[0])}${suffix}  y ${formatXRNumber(vector[1])}${suffix}  z ${formatXRNumber(vector[2])}${suffix}`;
+}
+
+function formatXRRotation(rotation) {
+  if (!rotation) return '--';
+  return `r ${formatXRNumber(rotation[0])}°  p ${formatXRNumber(rotation[1])}°  y ${formatXRNumber(rotation[2])}°`;
+}
+
+function formatXRAxes(axes) {
+  if (!axes?.length) return '--';
+  return axes.map((axis, index) => `a${index}:${formatXRNumber(axis)}`).join(' ');
+}
+
+function formatXRButtons(buttons) {
+  if (!buttons?.length) return '--';
+  const active = buttons.filter((button) => button.pressed || button.touched || button.value > 0.02);
+  if (!active.length) return 'repos';
+  return active.map((button) => `b${button.index}:${button.pressed ? 'P' : button.touched ? 'T' : formatXRNumber(button.value)}`).join(' ');
+}
+
+function formatXRNumber(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function screenDetectionToSphereAnchor(detection) {
+  const { x, y, w, h } = detection.box;
+  const centerX = THREE.MathUtils.clamp((x + w / 2) / window.innerWidth, 0, 1);
+  const centerY = THREE.MathUtils.clamp((y + h / 2) / window.innerHeight, 0, 1);
+  const yaw = (centerX - 0.5) * Math.PI * 2;
+  const pitch = THREE.MathUtils.clamp((0.5 - centerY) * Math.PI, -1.35, 1.35);
+
+  return new THREE.Vector3(
+    Math.sin(yaw) * Math.cos(pitch) * XR_HUD_RADIUS,
+    VIEWER_HEIGHT + Math.sin(pitch) * XR_HUD_RADIUS,
+    -Math.cos(yaw) * Math.cos(pitch) * XR_HUD_RADIUS
+  );
+}
+
+function createDetectionPanel(detection) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const isProduct = detection.type === 'product';
+  const accent = isProduct ? '#fdba74' : '#93c5fd';
+  const typeLabel = isProduct ? 'PRODUIT' : 'VISAGE';
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  roundRect(ctx, 8, 8, 496, 240, 24);
+  ctx.fillStyle = 'rgba(4, 9, 14, 0.84)';
+  ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.fillStyle = accent;
+  ctx.fillRect(28, 32, 8, 64);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.62)';
+  ctx.font = '700 24px JetBrains Mono, monospace';
+  ctx.fillText(typeLabel, 52, 58);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+  ctx.font = '700 38px Rajdhani, Arial, sans-serif';
+  fitText(ctx, detection.label, 52, 108, 390);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.74)';
+  ctx.font = '500 23px JetBrains Mono, monospace';
+  ctx.fillText(`CONF ${Math.round(detection.confidence * 100)}%`, 52, 154);
+
+  let y = 194;
+  if (detection.meta) {
+    ctx.font = '500 20px JetBrains Mono, monospace';
+    for (const [key, value] of Object.entries(detection.meta).slice(0, 2)) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.52)';
+      ctx.fillText(String(key).toUpperCase(), 52, y);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.fillText(String(value), 232, y);
+      y += 30;
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(XR_HUD_PANEL_WIDTH, XR_HUD_PANEL_HEIGHT), material);
+  mesh.renderOrder = 20;
+  return mesh;
+}
+
+function fitText(ctx, text, x, y, maxWidth) {
+  const value = String(text);
+  if (ctx.measureText(value).width <= maxWidth) {
+    ctx.fillText(value, x, y);
+    return;
+  }
+  let trimmed = value;
+  while (trimmed.length > 3 && ctx.measureText(`${trimmed}...`).width > maxWidth) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  ctx.fillText(`${trimmed}...`, x, y);
+}
+
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function drawXRRoundRect(ctx, x, y, width, height, radius) {
+  roundRect(ctx, x + 2, y + 2, width - 4, height - 4, radius);
 }

@@ -37,3 +37,14 @@ export const LIVEKIT = {
   ADAPTIVE_STREAM: true,
   DYNACAST: true,
 };
+
+export const TELEOPERATION = {
+  XR_INPUT_TOPIC: 'oscar.xr.input',
+  XR_INPUT_PUBLISH_HZ: 30,
+  XR_INPUT_DECIMALS: 4,
+};
+
+export const IMMERSIVE_VIDEO = {
+  FORCE_EQUIRECT: import.meta.env.VITE_FORCE_IMMERSIVE_360 === 'true',
+  REQUIRE_EQUIRECT_IN_VR: import.meta.env.VITE_REQUIRE_IMMERSIVE_360 === 'true',
+};

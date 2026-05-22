@@ -1,6 +1,8 @@
 - [Accueil](/)
 - [Roadmap](roadmap.md)
 - [Architecture](architecture.md)
+- [Pipeline immersion 360](immersive-video-pipeline.md)
+- [Téléopération XR LiveKit](xr-teleoperation-livekit.md)
 - [User Stories](user-stories.md)
 - [API Reference](api-reference.md)
 - [Guide de développement](dev-guide.md)

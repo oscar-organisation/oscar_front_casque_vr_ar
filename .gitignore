@@ -13,3 +13,4 @@ Exemple*.jpeg
 Exemple*.jpg
 Exemple*.png
 .vercel
+.env*

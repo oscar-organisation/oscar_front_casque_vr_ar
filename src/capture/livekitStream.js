@@ -17,7 +17,6 @@ import {
   Track,
   ConnectionState,
   ConnectionQuality,
-  LocalAudioTrack,
   createLocalAudioTrack,
 } from 'livekit-client';
 import { LIVEKIT } from '../config/constants.js';
@@ -25,6 +24,7 @@ import { LIVEKIT } from '../config/constants.js';
 let room = null;
 let videoElRef = null;
 let audioElRef = null;
+const dataEncoder = new TextEncoder();
 
 const listeners = new Set();
 const ATTACHED = { videoTrackSid: null, videoIdentity: null, audioTrackSid: null };
@@ -312,6 +312,51 @@ export async function toggleMicrophone() {
   }
   await enableMicrophone();
   return true;
+}
+
+/* ════════════════════════════════════════════════════════════
+   LiveKit data publishing (XR teleoperation, telemetry, commands)
+   ════════════════════════════════════════════════════════════ */
+
+/**
+ * Publishes a small data packet to the LiveKit room.
+ * Use reliable=false for continuous controls so stale packets are dropped.
+ *
+ * @param {string} topic
+ * @param {Object|Uint8Array|string} payload
+ * @param {{ reliable?: boolean, destinationIdentities?: string[] }} [options]
+ * @returns {boolean} true when the packet was accepted for publishing.
+ */
+export function publishDataPacket(topic, payload, options = {}) {
+  if (!room || room.state !== ConnectionState.Connected) return false;
+
+  const { reliable = false, destinationIdentities } = options;
+  const data = encodePayload(payload);
+
+  try {
+    const publishResult = room.localParticipant.publishData(data, {
+      reliable,
+      topic,
+      destinationIdentities,
+    });
+
+    if (publishResult?.catch) {
+      publishResult.catch((err) => {
+        console.warn(`[LiveKit] data publish failed on topic "${topic}"`, err);
+      });
+    }
+
+    return true;
+  } catch (err) {
+    console.warn(`[LiveKit] data publish failed on topic "${topic}"`, err);
+    return false;
+  }
+}
+
+function encodePayload(payload) {
+  if (payload instanceof Uint8Array) return payload;
+  if (typeof payload === 'string') return dataEncoder.encode(payload);
+  return dataEncoder.encode(JSON.stringify(payload));
 }
 
 /* ════════════════════════════════════════════════════════════

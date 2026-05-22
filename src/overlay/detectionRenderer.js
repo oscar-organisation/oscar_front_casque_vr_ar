@@ -4,6 +4,7 @@ import { createBoundingBox, removeBoundingBox, clearOverlays } from './overlayEn
 import { setLabel, clearLabels, updateDetectionCount } from '../hud/labelRenderer.js';
 import { setInfoPanel, clearInfoPanels } from '../hud/infoPanel.js';
 import { OVERLAY } from '../config/constants.js';
+import { renderXRDetections, clearXRDetections } from '../immersive/xrScene.js';
 
 /**
  * Processes a batch of detections: bounding boxes, labels, and info panels.
@@ -32,6 +33,7 @@ export function renderDetections(detections) {
     setInfoPanel(detection);
   });
 
+  renderXRDetections(detections);
   updateDetectionCount(detections.length);
 }
 
@@ -51,8 +53,10 @@ export function renderSingleDetection(detection) {
 
   setLabel(detection);
   setInfoPanel(detection);
+  renderXRDetections([detection]);
 }
 
 export function removeDetection(id) {
   removeBoundingBox(id);
+  clearXRDetections();
 }
