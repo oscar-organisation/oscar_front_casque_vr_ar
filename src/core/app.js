@@ -9,9 +9,10 @@ import { setStatus } from '../hud/statusManager.js';
 import { startClock } from '../hud/clockModule.js';
 import { startRobotTelemetry } from '../hud/robotTelemetry.js';
 import { startConnectionMetrics } from '../hud/connectionMetrics.js';
+import { initXRInputMonitor } from '../hud/xrInputMonitor.js';
 import { initMicButton } from '../hud/micButton.js';
 import { initVRButton } from '../hud/vrButton.js';
-import { initXRScene, onStreamUpdate, getProjectionMode } from '../immersive/xrScene.js';
+import { initXRScene, onStreamUpdate, getProjectionMode, getProjectionInfo } from '../immersive/xrScene.js';
 import { throttle } from '../utils/throttle.js';
 
 let isRunning = false;
@@ -28,6 +29,7 @@ export async function startApp() {
   startClock();
   startRobotTelemetry();
   startConnectionMetrics();
+  initXRInputMonitor();
   initMicButton();
 
   initOverlayEngine();
@@ -82,7 +84,12 @@ function reflectProjectionInHud() {
   const el = document.getElementById('metrics-projection');
   if (!el) return;
   const mode = getProjectionMode();
-  el.textContent = mode === 'equirect' ? 'IMMERSIF 360°' : 'ÉCRAN CINÉMA';
+  const info = getProjectionInfo();
+  if (mode === 'equirect') {
+    el.textContent = info?.confidence === 'explicit' ? 'IMMERSIF 360°' : 'IMMERSIF 360°*';
+    return;
+  }
+  el.textContent = 'ÉCRAN CINÉMA';
 }
 
 function loop() {

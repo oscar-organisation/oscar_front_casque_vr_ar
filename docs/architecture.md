@@ -5,7 +5,8 @@
 Le système suit un pipeline temps réel en 3 couches superposées dans le viewport :
 
 ```
-z-index 1 : Video Feed      ← flux caméra brut
+z-index 1 : Video Feed      ← flux robot LiveKit
+z-index 1/4 : XR Scene       ← écran cinéma ou sphère 360 en VR
 z-index 2 : Three.js Canvas  ← bounding boxes 3D (WebGL)
 z-index 3 : HUD DOM          ← labels, status bar (HTML/CSS)
 ```
@@ -18,13 +19,18 @@ src/
 ├── core/
 │   └── app.js               # Init, boucle de rendu, cycle de détection
 ├── capture/
-│   └── videoStream.js        # Flux webcam / headset
+│   ├── captureSource.js     # Source active du flux robot
+│   └── livekitStream.js     # Connexion LiveKit audio/vidéo/data
+├── immersive/
+│   └── xrScene.js           # Scène WebXR, projection flat/360
 ├── overlay/
 │   ├── overlayEngine.js      # Scène Three.js, caméra orthographique, bounding boxes
 │   └── detectionRenderer.js  # Mapping détections → overlays 3D + labels DOM
 ├── hud/
 │   ├── statusManager.js      # Barre de statut (état système)
 │   └── labelRenderer.js      # Labels 2D positionnés sur les détections
+├── teleoperation/
+│   └── xrInputPublisher.js   # Casque/contrôleurs WebXR → LiveKit Data
 ├── services/
 │   ├── mimicxClient.js       # Client API MimicX (Biometrix, Darwin)
 │   └── mockDetection.js      # Détections simulées (développement local)
@@ -38,7 +44,10 @@ src/
 ## Pipeline de détection
 
 ```
-Caméra → captureFrame() → base64 → MimicX API → détections[]
+Flux robot LiveKit → <video> → HUD/overlay/XR
+Session WebXR → casque + contrôleurs → LiveKit Data topic `oscar.xr.input` → bridge ROS
+
+Caméra / frame vidéo → captureFrame() → base64 → MimicX API → détections[]
                                                       │
                                     ┌─────────────────┤
                                     ▼                  ▼

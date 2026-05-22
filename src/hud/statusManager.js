@@ -13,10 +13,11 @@ const STATUS = {
   RECONNECTING: 'reconnexion en cours...',
   ERROR_CONNECTION: 'erreur : connexion perdue',
   ERROR_API: 'erreur : connexion API perdue',
+  ERROR_NON_IMMERSIVE: 'flux non immersif : vidéo 360 requise',
   DISCONNECTED: 'déconnecté du robot',
 };
 
-const ERROR_STATES = ['ERROR_CONNECTION', 'ERROR_API', 'DISCONNECTED'];
+const ERROR_STATES = ['ERROR_CONNECTION', 'ERROR_API', 'ERROR_NON_IMMERSIVE', 'DISCONNECTED'];
 const SCANNING_STATES = ['SCANNING', 'INIT', 'CONNECTING', 'WAITING_FOR_STREAM', 'RECONNECTING'];
 
 let fadeTimer = null;
