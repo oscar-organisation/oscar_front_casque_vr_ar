@@ -1,0 +1,19 @@
+{
+  "folders": [
+    { "path": "." }
+  ],
+  "settings": {
+    "livePreview.portNumber": 3000,
+    "editor.formatOnSave": true,
+    "files.associations": {
+      "*.html": "html"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.live-server",
+      "ritwickdey.liveserver",
+      "esbenp.prettier-vscode"
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Chargement OSCAR" />
+  <title>OSCAR VR — Chargement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="../css/oscar.css" />
+</head>
+<body>
+  <canvas id="three-canvas"></canvas>
+  <div id="vr-app">
+    <div class="screen active">
+      <div class="panel" style="width: min(420px, 90vw); text-align:center;">
+        <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:24px;">
+          <a href="selection.html" class="btn btn-secondary btn-sm" style="width:auto;">Retour</a>
+          <a href="../index.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
+        </div>
+
+        <h2 style="font-size:var(--font-lg); font-weight:800; margin-bottom:32px;">Chargement de la vue immersive</h2>
+
+        <div class="progress-ring-container">
+          <div class="progress-ring-wrap">
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <circle class="progress-ring-bg" cx="80" cy="80" r="70"></circle>
+              <circle class="progress-ring-fill" cx="80" cy="80" r="70"></circle>
+            </svg>
+            <div class="progress-ring-label">0%</div>
+          </div>
+
+          <div>
+            <p style="color:var(--text-secondary); font-size:var(--font-sm); margin-bottom:8px;">Connexion au flux en cours…</p>
+            <p class="progress-source-name">Caméra Rayon Boissons</p>
+            <p class="progress-source-sub" style="color:var(--text-secondary); font-size:var(--font-sm);">Allée 2</p>
+          </div>
+        </div>
+
+        <div class="vr-tip" style="margin-top:28px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <div class="vr-tip-text">
+            <strong>Conseil VR</strong>
+            Vous pouvez orienter votre tête pour regarder autour de vous.
+          </div>
+        </div>
+
+        <div id="webrtc-badge" class="webrtc-status" style="justify-content:center; margin-top:20px;">
+          <div class="webrtc-dot"></div>
+          <span>Initialisation WebRTC…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/three-webrtc.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      new OSCARBackground('three-canvas');
+
+      const robotName = localStorage.getItem('oscar-selected-robot-name') || 'Robot Rayon Boissons';
+      const robotLocation = localStorage.getItem('oscar-selected-robot-location') || 'Allée 2';
+
+      document.querySelector('.progress-source-name').textContent = robotName;
+      document.querySelector('.progress-source-sub').textContent = robotLocation;
+
+      const ring = document.querySelector('.progress-ring-fill');
+      const label = document.querySelector('.progress-ring-label');
+      const circumference = 2 * Math.PI * 70;
+      ring.style.strokeDasharray = circumference;
+
+      let progress = 0;
+      const timer = setInterval(() => {
+        progress += Math.random() * 8 + 3;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(timer);
+          label.textContent = '100%';
+          ring.style.strokeDashoffset = circumference * (1 - progress / 100);
+          setTimeout(() => {
+            const seen = sessionStorage.getItem('oscar-tutorial-done');
+            if (!seen) {
+              sessionStorage.setItem('oscar-tutorial-done', '1');
+              window.location.href = 'tutoriel.html';
+            } else {
+              window.location.href = 'immersive.html';
+            }
+          }, 600);
+          return;
+        }
+
+        label.textContent = `${Math.round(progress)}%`;
+        ring.style.strokeDashoffset = circumference * (1 - progress / 100);
+      }, 180);
+    });
+  </script>
+</body>
+</html>

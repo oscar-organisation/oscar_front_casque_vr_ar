@@ -2,28 +2,36 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OSCAR - RetailBot AR</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta http-equiv="refresh" content="0; url=pages/connexion.html" />
+  <title>OSCAR VR — Redirection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="css/oscar.css" />
 </head>
 <body>
-  <!--
-    The canvas where Three.js renders everything (video + 3D overlays).
-    Three.js will create its own canvas, so we just need a container.
-  -->
-  <div id="app">
-    <!-- Video element: captures webcam (later: Quest passthrough) -->
-    <video id="video-feed" autoplay playsinline></video>
-
-    <!-- Three.js will render its 3D canvas on top of the video -->
-    <div id="three-container"></div>
-
-    <!-- Simple HUD overlay for status messages -->
-    <div id="hud">
-      <div id="status">Initialisation...</div>
+  <canvas id="three-canvas"></canvas>
+  <div id="vr-app">
+    <div class="screen active">
+      <div class="panel" style="width:min(480px, 92vw); text-align:center;">
+        <div class="oscar-logo">
+          <div class="oscar-logo-ring"></div>
+          <span class="oscar-logo-text">OSCAR</span>
+        </div>
+        <p class="oscar-tagline">Redirection vers la connexion…</p>
+        <p style="color:var(--text-secondary); font-size:var(--font-sm); line-height:1.7;">
+          Si vous n’êtes pas redirigé automatiquement, cliquez sur <a href="pages/connexion.html" class="link">Connexion</a>.
+        </p>
+      </div>
     </div>
   </div>
 
-  <script type="module" src="/src/main.js"></script>
+  <script src="js/three-webrtc.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      new OSCARBackground('three-canvas');
+      window.location.replace('pages/connexion.html');
+    });
+  </script>
 </body>
 </html>

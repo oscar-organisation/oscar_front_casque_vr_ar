@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Tutoriel OSCAR" />
+  <title>OSCAR VR — Tutoriel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="../css/oscar.css" />
+</head>
+<body>
+  <canvas id="three-canvas"></canvas>
+  <div id="vr-app">
+    <div class="screen active">
+      <div class="panel" style="width: min(500px, 92vw);">
+        <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:24px;">
+          <a href="loading.html" class="btn btn-secondary btn-sm" style="width:auto;">Retour chargement</a>
+          <a href="../index.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
+        </div>
+
+        <h2 style="font-size:var(--font-xl); font-weight:800; text-align:center; margin-bottom:8px;">Bienvenue dans OSCAR</h2>
+        <p style="text-align:center; color:var(--text-secondary); font-size:var(--font-sm); margin-bottom:32px; line-height:1.7;">
+          Utilisez votre regard ou la manette<br/>pour interagir avec l'interface.
+        </p>
+
+        <div class="tutorial-item">
+          <div class="tutorial-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <span class="tutorial-text">Regardez un élément pour le sélectionner</span>
+        </div>
+
+        <div class="tutorial-item">
+          <div class="tutorial-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+              <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+              <line x1="6" y1="1" x2="6" y2="4"/>
+              <line x1="10" y1="1" x2="10" y2="4"/>
+              <line x1="14" y1="1" x2="14" y2="4"/>
+            </svg>
+          </div>
+          <span class="tutorial-text">Appuyez sur le bouton pour valider</span>
+        </div>
+
+        <div class="tutorial-item">
+          <div class="tutorial-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="16"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+          </div>
+          <span class="tutorial-text">Orientez votre tête pour explorer</span>
+        </div>
+
+        <div class="tutorial-item">
+          <div class="tutorial-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </div>
+          <span class="tutorial-text">Ouvrez le menu avec le bouton menu</span>
+        </div>
+
+        <a href="immersive.html" class="btn btn-primary" style="margin-top:28px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Commencer
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/three-webrtc.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      new OSCARBackground('three-canvas');
+    });
+  </script>
+</body>
+</html>

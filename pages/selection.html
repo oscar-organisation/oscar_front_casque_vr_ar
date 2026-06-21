@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Sélection de robot OSCAR" />
+  <title>OSCAR VR — Sélection robots</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="../css/oscar.css" />
+</head>
+<body>
+  <canvas id="three-canvas"></canvas>
+  <div id="vr-app">
+    <div class="screen active">
+      <div class="panel" style="width: min(560px, 94vw); max-height: 90vh; overflow-y: auto;">
+        <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:20px;">
+          <a href="connexion.html" class="btn btn-secondary btn-sm" style="width:auto;">Retour connexion</a>
+          <a href="../index.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
+        </div>
+
+        <h2 style="text-align:center; font-size:var(--font-lg); font-weight:800; margin-bottom:6px;">Sélection des robots</h2>
+        <p style="text-align:center; color:var(--text-secondary); font-size:var(--font-sm); margin-bottom:28px;">Choisissez une source à surveiller</p>
+
+        <div class="camera-card selected" data-robot-id="cam-boissons" data-robot-name="Robot Rayon Boissons" data-robot-location="Allée 2">
+          <div class="camera-thumb">
+            <div class="camera-thumb-placeholder">
+               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="11" width="18" height="10" rx="2"/>
+                <circle cx="12" cy="5" r="3"/>
+                <line x1="12" y1="8" x2="12" y2="11"/>
+                <line x1="7" y1="16" x2="7" y2="21"/>
+                <line x1="17" y1="16" x2="17" y2="21"/>
+              </svg>
+            </div>
+          </div>
+          <div class="camera-info">
+            <div class="camera-name">Robot Rayon Boissons</div>
+            <div class="camera-location">Allée 2</div>
+            <div class="badge badge-online"><span class="badge-dot"></span>En ligne</div>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+
+        <div class="camera-card" data-robot-id="robot-3" data-robot-name="Robot Allée 3" data-robot-location="Allée 3">
+          <div class="camera-thumb">
+            <div class="camera-thumb-placeholder">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="11" width="18" height="10" rx="2"/>
+                <circle cx="12" cy="5" r="3"/>
+                <line x1="12" y1="8" x2="12" y2="11"/>
+                <line x1="7" y1="16" x2="7" y2="21"/>
+                <line x1="17" y1="16" x2="17" y2="21"/>
+              </svg>
+            </div>
+          </div>
+          <div class="camera-info">
+            <div class="camera-name">Robot Allée 3</div>
+            <div class="camera-location">Allée 3</div>
+            <div class="badge badge-online"><span class="badge-dot"></span>En ligne</div>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+
+        <div class="camera-card" data-robot-id="cam-reserve" data-robot-name="Robot Réserve" data-robot-location="Réserve">
+          <div class="camera-thumb">
+            <div class="camera-thumb-placeholder">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="11" width="18" height="10" rx="2"/>
+                <circle cx="12" cy="5" r="3"/>
+                <line x1="12" y1="8" x2="12" y2="11"/>
+                <line x1="7" y1="16" x2="7" y2="21"/>
+                <line x1="17" y1="16" x2="17" y2="21"/>
+              </svg>
+            </div>
+          </div>
+          <div class="camera-info">
+            <div class="camera-name">Robot Réserve</div>
+            <div class="camera-location">Réserve</div>
+            <div class="badge badge-maintenance"><span class="badge-dot"></span>Maintenance</div>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+
+        <button id="btn-immersive" class="btn btn-primary" style="margin-top:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          Accéder à la vue immersive
+        </button>
+
+        <div class="bottom-nav">
+          <a href="selection.html" class="nav-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 7l-7 5 7 5V7z"/>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            Robots
+          </a>
+          <a href="anomalie.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            Alertes
+          </a>
+          <a href="tutoriel.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="12 8 12 12 14 14"/>
+              <path d="M3.05 11a9 9 0 1 0 .5-4.4"/>
+            </svg>
+            Historique
+          </a>
+          <a href="connexion.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Profil
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/three-webrtc.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      new OSCARBackground('three-canvas');
+
+      const cards = Array.from(document.querySelectorAll('.camera-card'));
+      cards.forEach((card) => {
+        card.addEventListener('click', () => {
+          cards.forEach((item) => item.classList.remove('selected'));
+          card.classList.add('selected');
+
+          localStorage.setItem('oscar-selected-robot-id', card.dataset.robotId);
+          localStorage.setItem('oscar-selected-robot-name', card.dataset.robotName);
+          localStorage.setItem('oscar-selected-robot-location', card.dataset.robotLocation);
+        });
+      });
+
+      document.getElementById('btn-immersive').addEventListener('click', () => {
+        const selected = localStorage.getItem('oscar-selected-robot-id') || 'cam-boissons';
+        localStorage.setItem('oscar-selected-robot-id', selected);
+        window.location.href = 'loading.html';
+      });
+    });
+  </script>
+</body>
+</html>
