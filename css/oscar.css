@@ -51,12 +51,15 @@
 
 html, body {
   width: 100%; height: 100%;
+  min-height: 100vh;
   background: radial-gradient(circle at top, #0d1726 0%, var(--bg-void) 70%);
   color: var(--text-primary);
   font-family: 'Exo 2', sans-serif;
   font-size: var(--font-base);
   line-height: 1.5;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -65,8 +68,12 @@ html, body {
 #vr-app {
   width: 100vw;
   height: 100vh;
+  min-height: 100vh;
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Canvas Three.js en fond */
@@ -85,6 +92,7 @@ html, body {
   z-index: 10;
   align-items: center;
   justify-content: center;
+  padding: clamp(16px, 3vw, 32px);
   animation: screenIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 .screen.active { display: flex; }
@@ -101,9 +109,14 @@ html, body {
   border-radius: var(--radius-xl);
   backdrop-filter: blur(24px) saturate(1.4);
   box-shadow: 0 8px 60px rgba(0,0,0,0.6), var(--glow-blue), inset 0 1px 0 rgba(255,255,255,0.05);
-  padding: 40px;
+  padding: clamp(28px, 4vw, 48px);
+  width: min(680px, 92vw);
+  max-width: min(760px, 92vw);
+  max-height: min(88vh, 900px);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 .panel::before {
@@ -261,7 +274,8 @@ html, body {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 18px 28px;
+  min-height: 56px;
+  padding: 16px 24px;
   border: none;
   border-radius: var(--radius-md);
   font-family: 'Exo 2', sans-serif;
@@ -310,7 +324,8 @@ html, body {
 }
 
 .btn-sm {
-  padding: 12px 20px;
+  min-height: 46px;
+  padding: 12px 18px;
   font-size: var(--font-sm);
   width: auto;
 }
@@ -381,7 +396,8 @@ html, body {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
+  padding: 18px 20px;
+  min-height: 92px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -550,8 +566,8 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  width: min(86vw, 760px);
-  padding: 10px 18px;
+  width: min(92vw, 860px);
+  padding: 12px 18px;
   background: rgba(6, 12, 20, 0.78);
   border: 1px solid rgba(125, 149, 180, 0.22);
   border-radius: 999px;
@@ -673,7 +689,8 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  width: min(94vw, 920px);
   background: rgba(6,12,20,0.82);
   border: 1px solid rgba(125,149,180,0.2);
   backdrop-filter: blur(14px) saturate(0.95);
@@ -725,6 +742,8 @@ html, body {
   transform: translateX(-50%);
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
   background: rgba(6,12,20,0.82);
   padding: 10px 12px;
   border-radius: 999px;
@@ -926,11 +945,23 @@ html, body {
 }
 
 @media (max-width: 768px) {
-  .panel { padding: 28px 24px; }
+  .panel { padding: 24px 20px; width: min(96vw, 680px); }
   :root {
     --font-base: 16px;
     --font-md: 20px;
   }
+  .btn { min-height: 52px; }
+  .camera-card { padding: 16px; min-height: 84px; }
+  .vr-sidebar { bottom: 16px; flex-wrap: wrap; }
+  .vr-bottombar { bottom: 92px; }
+}
+
+@media (max-width: 480px) {
+  .panel { padding: 20px 16px; }
+  .btn { font-size: 16px; }
+  .camera-card { gap: 12px; }
+  .vr-topbar { gap: 8px; padding: 10px 12px; }
+  .vr-title { display: none; }
 }
 
 /* ── Gaze cursor (VR) ─────────────────────────────────────── */
