@@ -10,14 +10,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="stylesheet" href="../css/oscar.css" />
 </head>
-<body>
+<body data-protect="true">
   <canvas id="three-canvas"></canvas>
   <div id="vr-app">
     <div class="screen active">
       <div class="panel" style="width: min(500px, 92vw); max-height: 90vh; overflow-y: auto;">
         <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:24px;">
           <a href="immersive.html" class="btn btn-secondary btn-sm" style="width:auto;">Retour immersive</a>
-          <a href="../index.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
+          <a href="connexion.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
         </div>
 
         <div class="anomaly-header">
@@ -95,6 +95,7 @@
   </div>
 
   <script src="../js/three-webrtc.js"></script>
+  <script src="../js/session.js"></script>
   <script>
     function showToast(message) {
       const existing = document.querySelector('.oscar-toast');

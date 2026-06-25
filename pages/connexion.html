@@ -44,7 +44,7 @@
 
           <div class="form-footer">
             <label class="checkbox-label">
-              <input type="checkbox" checked />
+              <input id="remember-me" type="checkbox" checked />
               <div class="checkbox-box">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5">
                   <polyline points="1.5,6 4.5,9 10.5,3"/>
@@ -73,26 +73,50 @@
   </div>
 
   <script src="../js/three-webrtc.js"></script>
+  <script src="../js/session.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       new OSCARBackground('three-canvas');
 
       const form = document.getElementById('login-form');
       const btn = document.getElementById('btn-login');
+      const emailInput = document.getElementById('input-email');
+      const passInput = document.getElementById('input-pass');
+      const rememberCheckbox = document.getElementById('remember-me');
+
+      const storedEmail = localStorage.getItem('oscar-remembered-email') || '';
+      const storedPass = localStorage.getItem('oscar-remembered-pass') || '';
+      if (storedEmail && storedPass) {
+        emailInput.value = storedEmail;
+        passInput.value = storedPass;
+        rememberCheckbox.checked = true;
+      }
 
       form.addEventListener('submit', (event) => {
         event.preventDefault();
-        const email = document.getElementById('input-email').value.trim();
-        const pass = document.getElementById('input-pass').value.trim();
+        const email = emailInput.value.trim();
+        const pass = passInput.value.trim();
+        const remember = rememberCheckbox.checked;
 
-        if (!email || !pass) {
-          document.getElementById('input-email').focus();
+        const isDemoAccount = (email === 'operateur@carrefour.fr' && pass === 'oscar2026') || (email && pass.length >= 4);
+
+        if (!email || !pass || !isDemoAccount) {
+          const target = !email || !pass ? document.getElementById('input-email') : document.getElementById('input-pass');
+          target?.focus();
           return;
         }
 
         btn.disabled = true;
         btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Connexion...';
         setTimeout(() => {
+          if (remember) {
+            localStorage.setItem('oscar-remembered-email', email);
+            localStorage.setItem('oscar-remembered-pass', pass);
+          } else {
+            localStorage.removeItem('oscar-remembered-email');
+            localStorage.removeItem('oscar-remembered-pass');
+          }
+          window.OSCARSession?.setAuthenticated(email);
           window.location.href = 'selection.html';
         }, 800);
       });

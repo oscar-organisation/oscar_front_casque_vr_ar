@@ -10,20 +10,42 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="stylesheet" href="../css/oscar.css" />
 </head>
-<body>
+<body data-protect="true">
   <canvas id="three-canvas"></canvas>
   <div id="vr-app">
     <div class="screen active">
       <div class="panel" style="width: min(560px, 94vw); max-height: 90vh; overflow-y: auto;">
         <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:20px;">
-          <a href="connexion.html" class="btn btn-secondary btn-sm" style="width:auto;">Retour connexion</a>
-          <a href="../index.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
+          <button type="button" class="btn btn-secondary btn-sm js-logout" style="width:auto;">Déconnexion</button>
+          <a href="connexion.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
         </div>
 
-        <h2 style="text-align:center; font-size:var(--font-lg); font-weight:800; margin-bottom:6px;">Sélection des robots</h2>
-        <p style="text-align:center; color:var(--text-secondary); font-size:var(--font-sm); margin-bottom:28px;">Choisissez une source à surveiller</p>
+        <div id="profile-panel" style="display:none; margin-bottom:24px; padding:20px; border:1px solid var(--border-subtle); border-radius:var(--radius-lg); background:rgba(255,255,255,0.04);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;">
+            <div>
+              <div style="font-size:var(--font-sm); color:var(--text-secondary); margin-bottom:4px;">Profil utilisateur</div>
+              <div id="profile-name" style="font-size:var(--font-md); font-weight:800;">Utilisateur</div>
+            </div>
+            <div style="width:48px; height:48px; border-radius:50%; background:rgba(30,143,255,0.16); display:flex; align-items:center; justify-content:center; color:var(--accent-blue);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+          </div>
+          <div style="display:grid; gap:10px; font-size:var(--font-sm); color:var(--text-secondary);">
+            <div><strong style="color:var(--text-primary);">Email :</strong> <span id="profile-email">-</span></div>
+            <div><strong style="color:var(--text-primary);">Rôle :</strong> <span id="profile-role">Opérateur</span></div>
+            <div><strong style="color:var(--text-primary);">Magasin :</strong> <span id="profile-store">Carrefour Saint-Lazare</span></div>
+            <div><strong style="color:var(--text-primary);">Dernière connexion :</strong> <span id="profile-last-login">-</span></div>
+          </div>
+        </div>
 
-        <div class="camera-card selected" data-robot-id="cam-boissons" data-robot-name="Robot Rayon Boissons" data-robot-location="Allée 2">
+        <div id="robots-panel">
+          <h2 style="text-align:center; font-size:var(--font-lg); font-weight:800; margin-bottom:6px;">Sélection des robots</h2>
+          <p style="text-align:center; color:var(--text-secondary); font-size:var(--font-sm); margin-bottom:28px;">Choisissez une source à surveiller</p>
+
+          <div class="camera-card selected" data-robot-id="cam-boissons" data-robot-name="Robot Rayon Boissons" data-robot-location="Allée 2">
           <div class="camera-thumb">
             <div class="camera-thumb-placeholder">
                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -58,7 +80,7 @@
             </div>
           </div>
           <div class="camera-info">
-            <div class="camera-name">Robot Allée 3</div>
+            <div class="camera-name">Robot Rayon Produits laitiers</div>
             <div class="camera-location">Allée 3</div>
             <div class="badge badge-online"><span class="badge-dot"></span>En ligne</div>
           </div>
@@ -89,13 +111,14 @@
           </svg>
         </div>
 
-        <button id="btn-immersive" class="btn btn-primary" style="margin-top:8px;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          Accéder à la vue immersive
-        </button>
+          <button id="btn-immersive" class="btn btn-primary" style="margin-top:8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Accéder à la vue immersive
+          </button>
+        </div>
 
         <div class="bottom-nav">
           <a href="selection.html" class="nav-item active">
@@ -112,26 +135,27 @@
             </svg>
             Alertes
           </a>
-          <a href="tutoriel.html" class="nav-item">
+          <button type="button" class="nav-item" id="nav-history" style="background:none; border:none; font:inherit; width:100%;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="12 8 12 12 14 14"/>
               <path d="M3.05 11a9 9 0 1 0 .5-4.4"/>
             </svg>
             Historique
-          </a>
-          <a href="connexion.html" class="nav-item">
+          </button>
+          <button type="button" class="nav-item" id="nav-profile" style="background:none; border:none; font:inherit; width:100%;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
             Profil
-          </a>
+          </button>
         </div>
       </div>
     </div>
   </div>
 
   <script src="../js/three-webrtc.js"></script>
+  <script src="../js/session.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       new OSCARBackground('three-canvas');
@@ -153,6 +177,76 @@
         localStorage.setItem('oscar-selected-robot-id', selected);
         window.location.href = 'loading.html';
       });
+
+      const profilePanel = document.getElementById('profile-panel');
+      const robotsPanel = document.getElementById('robots-panel');
+      const navProfile = document.getElementById('nav-profile');
+      const profileName = document.getElementById('profile-name');
+      const profileEmail = document.getElementById('profile-email');
+      const profileRole = document.getElementById('profile-role');
+      const profileStore = document.getElementById('profile-store');
+      const profileLastLogin = document.getElementById('profile-last-login');
+
+      const showProfile = () => {
+        const email = sessionStorage.getItem('oscar-auth-user') || localStorage.getItem('oscar-remembered-email') || 'operateur@carrefour.fr';
+        const role = 'Opérateur';
+        const store = 'Carrefour Saint-Lazare';
+        const lastLogin = new Date().toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+
+        profileName.textContent = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        profileEmail.textContent = email;
+        profileRole.textContent = role;
+        profileStore.textContent = store;
+        profileLastLogin.textContent = lastLogin;
+
+        profilePanel.style.display = 'block';
+        robotsPanel.style.display = 'none';
+        navProfile.classList.add('active');
+      };
+
+      const showRobots = () => {
+        profilePanel.style.display = 'none';
+        robotsPanel.style.display = 'block';
+        navProfile.classList.remove('active');
+      };
+
+      navProfile.addEventListener('click', () => {
+        const isVisible = profilePanel.style.display === 'block';
+        if (isVisible) {
+          showRobots();
+        } else {
+          showProfile();
+        }
+      });
+
+      const navHistory = document.getElementById('nav-history');
+      const showToast = (message) => {
+        const existing = document.querySelector('.oscar-toast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.className = 'oscar-toast';
+        toast.textContent = message;
+        toast.style.cssText = `position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(8,18,35,0.95); border: 1px solid rgba(30,143,255,0.4); color: #E8F0FF; padding: 14px 28px; border-radius: 100px; font-family: 'Exo 2', sans-serif; font-size: 16px; font-weight: 600; z-index: 9999; white-space: nowrap; box-shadow: 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(30,143,255,0.2);`;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.remove(); }, 2400);
+      };
+
+      document.querySelectorAll('.nav-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          if (item.id === 'nav-profile') return;
+          if (item.id === 'nav-history') {
+            showToast('Fonctionnalité bientôt disponible');
+            return;
+          }
+          showRobots();
+        });
+      });
+
+      navHistory.addEventListener('click', () => {
+        showToast('Fonctionnalité bientôt disponible');
+      });
+
+      showRobots();
     });
   </script>
 </body>

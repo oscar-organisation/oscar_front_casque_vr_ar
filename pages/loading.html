@@ -10,14 +10,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="stylesheet" href="../css/oscar.css" />
 </head>
-<body>
+<body data-protect="true">
   <canvas id="three-canvas"></canvas>
   <div id="vr-app">
     <div class="screen active">
       <div class="panel" style="width: min(420px, 90vw); text-align:center;">
         <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:24px;">
           <a href="selection.html" class="btn btn-secondary btn-sm" style="width:auto;">Retour</a>
-          <a href="../index.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
+          <a href="connexion.html" class="btn btn-outline btn-sm" style="width:auto;">Accueil</a>
         </div>
 
         <h2 style="font-size:var(--font-lg); font-weight:800; margin-bottom:32px;">Chargement de la vue immersive</h2>
@@ -59,6 +59,7 @@
   </div>
 
   <script src="../js/three-webrtc.js"></script>
+  <script src="../js/session.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       new OSCARBackground('three-canvas');

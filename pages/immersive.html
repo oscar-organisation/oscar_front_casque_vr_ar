@@ -10,7 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="stylesheet" href="../css/oscar.css" />
 </head>
-<body>
+<body data-protect="true">
   <canvas id="three-canvas"></canvas>
   <div id="vr-app" class="screen active" style="padding:0;">
     <canvas id="immersive-canvas" style="width:100%;height:100%;display:block;"></canvas>
@@ -137,6 +137,7 @@
   </div>
 
   <script src="../js/three-webrtc.js"></script>
+  <script src="../js/session.js"></script>
   <script>
     function showToast(message) {
       const existing = document.querySelector('.oscar-toast');
