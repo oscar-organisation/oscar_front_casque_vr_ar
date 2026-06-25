@@ -173,6 +173,20 @@ class OSCARVR360 {
     this.lastMouse  = { x: 0, y: 0 };
     this.sphereYaw   = 0;
     this.spherePitch = 0;
+    this.useStereo   = false;
+    this.ipd         = 0.06;
+    this.vignetteStrength = 0;
+    this.motionIntensity = 0;
+    this.lastViewYaw = 0;
+    this.lastViewPitch = 0;
+    this.controllers = [];
+    this.vignetteEl  = document.getElementById('vr-vignette');
+    this.stereoBtn   = document.getElementById('btn-stereo');
+    this.vrEnterBtn  = document.getElementById('btn-vr-enter');
+    this.hudEl       = document.querySelector('.vr-hud');
+    this.comfortShell = document.getElementById('vr-comfort-shell');
+    this.latencyPill = document.getElementById('vr-latency-pill');
+    this.comfortMode = false;
 
     this._init();
     this._bindControls();
@@ -210,11 +224,20 @@ class OSCARVR360 {
     this.scene.add(floor);
 
     this.camera.position.set(0, 0, 0);
+    this.leftCamera = new THREE.PerspectiveCamera(90, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
+    this.rightCamera = new THREE.PerspectiveCamera(90, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
+    this.leftCamera.position.set(-this.ipd / 2, 0, 0);
+    this.rightCamera.position.set(this.ipd / 2, 0, 0);
 
     // VR Support WebXR (si disponible)
     if ('xr' in navigator) {
       this.renderer.xr.enabled = true;
+      this.renderer.xr.setReferenceSpaceType('local');
     }
+
+    this._setupXRControllers();
+    this.enterComfortMode(false);
+    this._syncHUD();
   }
 
   _createStoreTexture() {
@@ -300,6 +323,102 @@ class OSCARVR360 {
   updateCameraOrientation(yaw, pitch) {
     this.sphereYaw   = yaw;
     this.spherePitch = pitch;
+    this.setMotionIntensity(0.18);
+  }
+
+  toggleStereo() {
+    this.useStereo = !this.useStereo;
+    this._syncHUD();
+  }
+
+  enterComfortMode(force = true) {
+    this.comfortMode = force;
+    if (this.comfortShell) {
+      this.comfortShell.style.display = this.comfortMode ? 'block' : 'none';
+    }
+    if (this.hudEl) {
+      this.hudEl.classList.toggle('vr-comfort-active', this.comfortMode);
+    }
+  }
+
+  updateLatency(latencyMs) {
+    if (this.latencyPill) {
+      const label = latencyMs < 80 ? 'Faible' : latencyMs < 180 ? 'Correct' : 'Élevée';
+      this.latencyPill.textContent = `Latence WebRTC · ${Math.round(latencyMs)} ms (${label})`;
+    }
+  }
+
+  _syncHUD() {
+    if (this.stereoBtn) {
+      this.stereoBtn.classList.toggle('active', this.useStereo);
+    }
+    if (this.vrEnterBtn) {
+      this.vrEnterBtn.classList.toggle('active', this.isVR);
+    }
+  }
+
+  setMotionIntensity(intensity) {
+    this.motionIntensity = Math.min(0.6, Math.max(this.motionIntensity, intensity));
+  }
+
+  _setupXRControllers() {
+    for (let i = 0; i < 2; i++) {
+      const controller = this.renderer.xr.getController(i);
+      controller.addEventListener('selectstart', () => this._handleXRAction('trigger'));
+      controller.addEventListener('squeezestart', () => this._handleXRAction('squeeze'));
+      this.scene.add(controller);
+
+      const grip = this.renderer.xr.getControllerGrip(i);
+      this.scene.add(grip);
+      this.controllers.push({ controller, grip });
+    }
+  }
+
+  _handleXRAction(action) {
+    if (action === 'trigger') {
+      this.toggleStereo();
+    } else if (action === 'squeeze') {
+      this.sphereYaw = 0;
+      this.spherePitch = 0;
+    }
+  }
+
+  _updateControllerInput() {
+    this.controllers.forEach(({ controller }) => {
+      if (!controller.gamepad) return;
+      const [x, y] = controller.gamepad.axes;
+      if (Math.abs(x) > 0.15) this.sphereYaw -= x * 0.012;
+      if (Math.abs(y) > 0.15) this.spherePitch -= y * 0.012;
+    });
+  }
+
+  _renderScene() {
+    if (!this.useStereo) {
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
+    const halfWidth = width / 2;
+    const aspect = width / height;
+
+    this.leftCamera.aspect = aspect;
+    this.rightCamera.aspect = aspect;
+    this.leftCamera.updateProjectionMatrix();
+    this.rightCamera.updateProjectionMatrix();
+
+    this.renderer.setScissorTest(true);
+
+    this.renderer.setScissor(0, 0, halfWidth, height);
+    this.renderer.setViewport(0, 0, halfWidth, height);
+    this.renderer.render(this.scene, this.leftCamera);
+
+    this.renderer.setScissor(halfWidth, 0, halfWidth, height);
+    this.renderer.setViewport(halfWidth, 0, halfWidth, height);
+    this.renderer.render(this.scene, this.rightCamera);
+
+    this.renderer.setScissorTest(false);
   }
 
   _bindControls() {
@@ -343,6 +462,10 @@ class OSCARVR360 {
       const h = this.canvas.parentElement.clientHeight;
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
+      this.leftCamera.aspect = w / h;
+      this.rightCamera.aspect = w / h;
+      this.leftCamera.updateProjectionMatrix();
+      this.rightCamera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
     });
 
@@ -352,6 +475,7 @@ class OSCARVR360 {
         if (e.alpha !== null) {
           this.sphereYaw   = THREE.MathUtils.degToRad(-e.alpha);
           this.spherePitch = THREE.MathUtils.degToRad(e.beta - 90) * 0.5;
+          this.setMotionIntensity(0.22);
         }
       });
     }
@@ -361,14 +485,42 @@ class OSCARVR360 {
     requestAnimationFrame(() => this._animate());
     const t = this.clock.getElapsedTime();
 
+    this._updateControllerInput();
+
     // Rotation caméra
     const euler = new THREE.Euler(this.spherePitch, this.sphereYaw, 0, 'YXZ');
     this.camera.quaternion.setFromEuler(euler);
 
+    if (this.leftCamera && this.rightCamera) {
+      this.leftCamera.quaternion.copy(this.camera.quaternion);
+      this.rightCamera.quaternion.copy(this.camera.quaternion);
+      this.leftCamera.position.set(-this.ipd / 2, 0, 0);
+      this.rightCamera.position.set(this.ipd / 2, 0, 0);
+    }
+
     // Légère oscillation ambiante
     this.sphere.rotation.y = Math.sin(t * 0.03) * 0.01;
 
-    this.renderer.render(this.scene, this.camera);
+    const turnSpeed = Math.abs(this.sphereYaw - this.lastViewYaw) + Math.abs(this.spherePitch - this.lastViewPitch);
+    if (turnSpeed > 0.001) {
+      this.motionIntensity = Math.min(0.6, this.motionIntensity + turnSpeed * 0.6);
+    } else {
+      this.motionIntensity = Math.max(0, this.motionIntensity - 0.025);
+    }
+
+    this.vignetteStrength = this.motionIntensity;
+    if (this.vignetteEl) {
+      this.vignetteEl.style.opacity = `${Math.min(0.55, 0.12 + this.vignetteStrength)}`;
+    }
+
+    if (this.latencyPill) {
+      const simulatedLatency = 32 + Math.abs(Math.sin(t * 0.7)) * 40;
+      this.updateLatency(simulatedLatency);
+    }
+    this.lastViewYaw = this.sphereYaw;
+    this.lastViewPitch = this.spherePitch;
+
+    this._renderScene();
   }
 
   async enterVRMode() {
@@ -378,7 +530,15 @@ class OSCARVR360 {
         if (supported) {
           const session = await navigator.xr.requestSession('immersive-vr');
           this.renderer.xr.setSession(session);
+          this.renderer.xr.setReferenceSpaceType('local');
           this.isVR = true;
+          this.enterComfortMode(true);
+          this._syncHUD();
+          session.addEventListener('end', () => {
+            this.isVR = false;
+            this.enterComfortMode(false);
+            this._syncHUD();
+          });
           return true;
         }
       } catch (e) {

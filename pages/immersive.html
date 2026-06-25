@@ -16,6 +16,17 @@
     <canvas id="immersive-canvas" style="width:100%;height:100%;display:block;"></canvas>
 
     <div class="vr-hud">
+      <div id="vr-vignette" class="vr-vignette"></div>
+
+      <div id="vr-comfort-shell" class="vr-comfort-shell" aria-hidden="true">
+        <div id="vr-latency-pill" class="vr-pill">Latence WebRTC · 0 ms</div>
+        <button id="btn-estop" class="vr-estop" type="button">E-STOP</button>
+        <div class="vr-comfort-dock">
+          <button id="btn-comfort-recenter" class="vr-mini-btn" type="button">Recentrer</button>
+          <button id="btn-comfort-stereo" class="vr-mini-btn" type="button">Stéréo</button>
+        </div>
+      </div>
+
       <div class="vr-topbar">
         <div class="vr-live-badge">
           <div class="vr-live-dot"></div>
@@ -110,6 +121,21 @@
       </div>
 
       <div class="vr-bottombar">
+        <button id="btn-stereo" class="bottom-action" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M3 7v10a2 2 0 0 0 2 2h3"/>
+            <path d="M21 7v10a2 2 0 0 1-2 2h-3"/>
+            <rect x="8" y="4" width="8" height="16" rx="2"/>
+          </svg>
+          <span>Stéréo</span>
+        </button>
+        <button id="btn-vr-enter" class="bottom-action" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span>Entrer en WebXR</span>
+        </button>
         <button id="btn-recenter" class="bottom-action" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
             <path d="M21 3L3 21"/>
@@ -174,6 +200,54 @@
         vr.spherePitch = 0;
         showToast('Vue recentrée');
       });
+
+      document.getElementById('btn-comfort-recenter').addEventListener('click', () => {
+        vr.sphereYaw = 0;
+        vr.spherePitch = 0;
+        showToast('Vue recentrée');
+      });
+
+      document.getElementById('btn-stereo').addEventListener('click', () => {
+        vr.toggleStereo();
+        showToast(vr.useStereo ? 'Mode stéréo activé' : 'Mode stéréo désactivé');
+      });
+
+      document.getElementById('btn-comfort-stereo').addEventListener('click', () => {
+        vr.toggleStereo();
+        showToast(vr.useStereo ? 'Mode stéréo activé' : 'Mode stéréo désactivé');
+      });
+
+      document.getElementById('btn-estop').addEventListener('click', () => {
+        showToast('E-STOP activé — arrêt immédiat demandé');
+      });
+
+      const vrEnterBtn = document.getElementById('btn-vr-enter');
+      vrEnterBtn.addEventListener('click', async () => {
+        const entered = await vr.enterVRMode();
+        if (!entered) {
+          showToast('WebXR indisponible');
+        } else {
+          showToast('Mode VR confort activé');
+        }
+      });
+
+      if (navigator.xr) {
+        navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+          if (supported) {
+            vrEnterBtn.classList.add('active');
+            vrEnterBtn.querySelector('span').textContent = 'Entrer en WebXR';
+          } else {
+            vrEnterBtn.classList.add('disabled');
+            vrEnterBtn.querySelector('span').textContent = 'WebXR indisponible';
+          }
+        }).catch(() => {
+          vrEnterBtn.classList.add('disabled');
+          vrEnterBtn.querySelector('span').textContent = 'WebXR indisponible';
+        });
+      } else {
+        vrEnterBtn.classList.add('disabled');
+        vrEnterBtn.querySelector('span').textContent = 'WebXR indisponible';
+      }
 
       document.getElementById('btn-zoom-out').addEventListener('click', () => {
         zoomLevel = zoomLevel === 1 ? 1.5 : 1;
