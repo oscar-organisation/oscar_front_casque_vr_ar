@@ -842,8 +842,13 @@ function formatXRNumber(value) {
 
 function screenDetectionToSphereAnchor(detection) {
   const { x, y, w, h } = detection.box;
-  const centerX = THREE.MathUtils.clamp((x + w / 2) / window.innerWidth, 0, 1);
-  const centerY = THREE.MathUtils.clamp((y + h / 2) / window.innerHeight, 0, 1);
+  const normalized = detection.normalizedBox;
+  const centerX = normalized
+    ? THREE.MathUtils.clamp(normalized.x + normalized.w / 2, 0, 1)
+    : THREE.MathUtils.clamp((x + w / 2) / window.innerWidth, 0, 1);
+  const centerY = normalized
+    ? THREE.MathUtils.clamp(normalized.y + normalized.h / 2, 0, 1)
+    : THREE.MathUtils.clamp((y + h / 2) / window.innerHeight, 0, 1);
   const yaw = (centerX - 0.5) * Math.PI * 2;
   const pitch = THREE.MathUtils.clamp((0.5 - centerY) * Math.PI, -1.35, 1.35);
 
@@ -860,19 +865,20 @@ function createDetectionPanel(detection) {
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   const isProduct = detection.type === 'product';
-  const accent = isProduct ? '#fdba74' : '#93c5fd';
-  const typeLabel = isProduct ? 'PRODUIT' : 'VISAGE';
+  const accent = detection.type === 'incident' ? '#d98072' : isProduct ? '#d85810' : '#9bb8a4';
+  const typeLabel = String(detection.type || 'détection').toUpperCase();
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   roundRect(ctx, 8, 8, 496, 240, 24);
-  ctx.fillStyle = 'rgba(4, 9, 14, 0.84)';
+  ctx.fillStyle = 'rgba(18, 20, 22, 0.62)';
   ctx.fill();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   ctx.fillStyle = accent;
-  ctx.fillRect(28, 32, 8, 64);
+  roundRect(ctx, 28, 38, 8, 54, 4);
+  ctx.fill();
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.62)';
   ctx.font = '700 24px JetBrains Mono, monospace';

@@ -143,6 +143,7 @@ body.xr-active #hud {
 #vr-button[hidden] { display: none; }
 
 [data-mock-overlay][hidden],
+[data-vision-overlay][hidden],
 [data-diagnostic-overlay][hidden] { display: none !important; }
 
 body:not(.diagnostic-overlays-enabled) #hud::before,
@@ -485,29 +486,43 @@ body:not(.diagnostic-overlays-enabled) #hud::after { display: none; }
   flex-direction: column;
   gap: 1px;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 .detection-label__tag {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: var(--glass-bg-strong);
-  border: var(--glass-border-soft);
-  border-radius: var(--r-sm);
-  padding: 5px 10px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  gap: 9px;
+  min-height: 28px;
+  background: rgba(18, 20, 22, 0.54);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  padding: 5px 9px 5px 8px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0;
   white-space: nowrap;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(14px) saturate(118%);
+  -webkit-backdrop-filter: blur(14px) saturate(118%);
+  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-.detection-label__tag--face    { border-left: 2px solid var(--c-face); }
-.detection-label__tag--product { border-left: 2px solid var(--c-product); }
-.detection-label__name { color: var(--c-text); }
-.detection-label__confidence { color: var(--c-text-dim); font-size: 9px; }
+.detection-label__tag::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--detection-accent, rgba(255, 255, 255, 0.72));
+  content: "";
+}
+.detection-label__tag--face,
+.detection-label__tag--person { --detection-accent: #9bb8a4; }
+.detection-label__tag--product { --detection-accent: #d85810; }
+.detection-label__tag--incident { --detection-accent: #d98072; }
+.detection-label__tag--object { --detection-accent: #e7e3dc; }
+.detection-label__name { color: rgba(255, 255, 255, 0.94); font-weight: 600; }
+.detection-label__confidence {
+  color: rgba(255, 255, 255, 0.58);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
 
 .info-panel {
   position: absolute;
