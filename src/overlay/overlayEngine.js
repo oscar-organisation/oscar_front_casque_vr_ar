@@ -64,13 +64,29 @@ export function createBoundingBox(id, x, y, width, height, label = '', color = O
 
   const geometry = new THREE.PlaneGeometry(width, height);
 
-  // Border
-  const edges = new THREE.EdgesGeometry(geometry);
-  const border = new THREE.LineSegments(
-    edges,
-    new THREE.LineBasicMaterial({ color, linewidth: OVERLAY.BORDER_WIDTH })
+  // Quiet corner guides keep the target readable without boxing the image in.
+  const halfW = width / 2;
+  const halfH = height / 2;
+  const cornerX = Math.min(28, Math.max(10, width * 0.16));
+  const cornerY = Math.min(28, Math.max(10, height * 0.16));
+  const vertices = new Float32Array([
+    -halfW, halfH, 0, -halfW + cornerX, halfH, 0,
+    -halfW, halfH, 0, -halfW, halfH - cornerY, 0,
+    halfW, halfH, 0, halfW - cornerX, halfH, 0,
+    halfW, halfH, 0, halfW, halfH - cornerY, 0,
+    -halfW, -halfH, 0, -halfW + cornerX, -halfH, 0,
+    -halfW, -halfH, 0, -halfW, -halfH + cornerY, 0,
+    halfW, -halfH, 0, halfW - cornerX, -halfH, 0,
+    halfW, -halfH, 0, halfW, -halfH + cornerY, 0,
+  ]);
+  const guideGeometry = new THREE.BufferGeometry();
+  guideGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  const guides = new THREE.LineSegments(
+    guideGeometry,
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.78 })
   );
-  group.add(border);
+  guides.position.z = 0.5;
+  group.add(guides);
 
   // Semi-transparent fill
   const fill = new THREE.Mesh(

@@ -17,9 +17,9 @@ export function setLabel(detection) {
     activeLabels.set(detection.id, el);
   }
 
-  // Position above the bounding box
-  el.style.left = `${detection.box.x}px`;
-  el.style.top = `${detection.box.y - 22}px`;
+  // Keep the glass tag inside the viewport, above the target when possible.
+  el.style.left = `${Math.max(8, detection.box.x)}px`;
+  el.style.top = `${Math.max(8, detection.box.y - 34)}px`;
 
   // Update content
   const nameEl = el.querySelector('.detection-label__name');

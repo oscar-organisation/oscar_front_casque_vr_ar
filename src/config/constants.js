@@ -2,6 +2,8 @@
 
 import { bootstrapLiveKitSession, decodeJwtClaims, isJwtExpired } from './sessionBootstrap.js';
 
+const ENV = import.meta.env || {};
+
 export const APP = {
   NAME: 'OSCAR',
   FULL_NAME: 'O.S.C.A.R.',
@@ -10,11 +12,13 @@ export const APP = {
 };
 
 export const OVERLAY = {
-  DEFAULT_COLOR: 0x00f0ff,
-  FACE_COLOR: 0x4a9eff,
-  PRODUCT_COLOR: 0xffaa00,
-  FILL_OPACITY: 0.08,
-  BORDER_WIDTH: 2,
+  DEFAULT_COLOR: 0xe7e3dc,
+  PERSON_COLOR: 0x9bb8a4,
+  FACE_COLOR: 0x9bb8a4,
+  PRODUCT_COLOR: 0xd85810,
+  INCIDENT_COLOR: 0xd98072,
+  FILL_OPACITY: 0.035,
+  BORDER_WIDTH: 1,
   Z_DEPTH: 500,
 };
 
@@ -27,9 +31,11 @@ export const HUD = {
 
 export const FEATURES = {
   // Demo detections and simulated telemetry must be explicitly enabled.
-  MOCK_OVERLAYS: import.meta.env.VITE_ENABLE_MOCK_OVERLAYS === 'true',
+  MOCK_OVERLAYS: ENV.VITE_ENABLE_MOCK_OVERLAYS === 'true',
   // Connection/input diagnostics obscure the operator view, especially in VR.
-  DIAGNOSTIC_OVERLAYS: import.meta.env.VITE_ENABLE_DIAGNOSTIC_OVERLAYS === 'true',
+  DIAGNOSTIC_OVERLAYS: ENV.VITE_ENABLE_DIAGNOSTIC_OVERLAYS === 'true',
+  // Real model results received from the perception worker.
+  VISION_OVERLAYS: ENV.VITE_ENABLE_VISION_OVERLAYS !== 'false',
 };
 
 export const API = {
@@ -56,19 +62,19 @@ function roomFromToken(token) {
   return decodeJwtClaims(token)?.video?.room || '';
 }
 
-const bakedToken = import.meta.env.VITE_LIVEKIT_TOKEN || '';
+const bakedToken = ENV.VITE_LIVEKIT_TOKEN || '';
 const livekitToken = session.token || (isJwtExpired(bakedToken) ? '' : bakedToken);
 const livekitRoom = session.room
   || roomFromToken(livekitToken)
-  || import.meta.env.VITE_LIVEKIT_ROOM
+  || ENV.VITE_LIVEKIT_ROOM
   || 'oscar-lot1-room';
 
 export const LIVEKIT = {
-  URL: session.url || import.meta.env.VITE_LIVEKIT_URL || '',
+  URL: session.url || ENV.VITE_LIVEKIT_URL || '',
   ROOM: livekitRoom,
   TOKEN: livekitToken,
   PREFERRED_PUBLISHER: session.publisher
-    || import.meta.env.VITE_LIVEKIT_PREFERRED_PUBLISHER
+    || ENV.VITE_LIVEKIT_PREFERRED_PUBLISHER
     || '',
   ROOM_PUBLISHER: inferPublisherIdentity(livekitRoom),
   AUTO_SUBSCRIBE: true,
@@ -84,7 +90,13 @@ export const TELEOPERATION = {
   XR_INPUT_DECIMALS: 4,
 };
 
+export const VISION = {
+  OVERLAY_TOPIC: 'oscar.vision.overlay',
+  SCHEMA: 'oscar.vision.overlay.v1',
+  STALE_AFTER_MS: 1200,
+};
+
 export const IMMERSIVE_VIDEO = {
-  FORCE_EQUIRECT: import.meta.env.VITE_FORCE_IMMERSIVE_360 === 'true',
-  REQUIRE_EQUIRECT_IN_VR: import.meta.env.VITE_REQUIRE_IMMERSIVE_360 === 'true',
+  FORCE_EQUIRECT: ENV.VITE_FORCE_IMMERSIVE_360 === 'true',
+  REQUIRE_EQUIRECT_IN_VR: ENV.VITE_REQUIRE_IMMERSIVE_360 === 'true',
 };

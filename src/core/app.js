@@ -1,10 +1,11 @@
 /** Application core — initialization and render loop */
 
 import { initCaptureSource } from '../capture/captureSource.js';
-import { onStateChange, ConnectionState } from '../capture/livekitStream.js';
+import { onDataPacket, onStateChange, ConnectionState } from '../capture/livekitStream.js';
 import { initOverlayEngine, render as renderOverlay } from '../overlay/overlayEngine.js';
 import { renderDetections } from '../overlay/detectionRenderer.js';
 import { generateMockDetections } from '../services/mockDetection.js';
+import { parseVisionPacket } from '../overlay/visionPacket.js';
 import { setStatus } from '../hud/statusManager.js';
 import { startClock } from '../hud/clockModule.js';
 import { startRobotTelemetry } from '../hud/robotTelemetry.js';
@@ -16,10 +17,11 @@ import { initXRScene, onStreamUpdate, getProjectionMode, getProjectionInfo } fro
 import { onXRStateChange } from '../immersive/xrScene.js';
 import { initDesktopInputPublisher, setDesktopInputSuspended } from '../teleoperation/desktopInputPublisher.js';
 import { throttle } from '../utils/throttle.js';
-import { FEATURES } from '../config/constants.js';
+import { FEATURES, VISION } from '../config/constants.js';
 
 let isRunning = false;
 let detectionsActive = false;
+let visionExpiryTimer = null;
 
 const processDetections = throttle(() => {
   if (!detectionsActive) return;
@@ -34,12 +36,29 @@ export async function startApp() {
   initXRInputMonitor();
   initMicButton();
   setOverlayElementsVisible('[data-mock-overlay]', FEATURES.MOCK_OVERLAYS);
+  setOverlayElementsVisible('[data-vision-overlay]', false);
   setOverlayElementsVisible('[data-diagnostic-overlay]', FEATURES.DIAGNOSTIC_OVERLAYS);
   document.body.classList.toggle('diagnostic-overlays-enabled', FEATURES.DIAGNOSTIC_OVERLAYS);
 
   if (FEATURES.MOCK_OVERLAYS) {
     startRobotTelemetry();
+  }
+  if (FEATURES.MOCK_OVERLAYS || FEATURES.VISION_OVERLAYS) {
     initOverlayEngine();
+  }
+
+  if (FEATURES.VISION_OVERLAYS) {
+    onDataPacket(VISION.OVERLAY_TOPIC, (payload) => {
+      try {
+        const detections = parseVisionPacket(payload);
+        clearTimeout(visionExpiryTimer);
+        setOverlayElementsVisible('[data-vision-overlay]', detections.length > 0);
+        renderDetections(detections);
+        visionExpiryTimer = setTimeout(clearVisionOverlays, VISION.STALE_AFTER_MS);
+      } catch (error) {
+        console.warn('[Vision] Invalid overlay packet ignored', error);
+      }
+    });
   }
 
   const videoEl = document.getElementById('video-feed');
@@ -73,6 +92,7 @@ export async function startApp() {
         setStatus('STREAMING');
       } else {
         detectionsActive = false;
+        if (FEATURES.VISION_OVERLAYS) clearVisionOverlays();
         setStatus('WAITING_FOR_STREAM');
       }
       reflectProjectionInHud();
@@ -82,6 +102,7 @@ export async function startApp() {
       setStatus('RECONNECTING');
     } else if (state.connectionState === ConnectionState.Disconnected) {
       detectionsActive = false;
+      if (FEATURES.VISION_OVERLAYS) clearVisionOverlays();
       setStatus('DISCONNECTED');
     }
   });
@@ -106,6 +127,8 @@ function loop() {
   if (!isRunning) return;
   if (FEATURES.MOCK_OVERLAYS) {
     processDetections();
+  }
+  if (FEATURES.MOCK_OVERLAYS || FEATURES.VISION_OVERLAYS) {
     renderOverlay();
   }
   requestAnimationFrame(loop);
@@ -119,4 +142,13 @@ function setOverlayElementsVisible(selector, visible) {
 
 export function stopApp() {
   isRunning = false;
+  clearTimeout(visionExpiryTimer);
+  clearVisionOverlays();
+}
+
+function clearVisionOverlays() {
+  clearTimeout(visionExpiryTimer);
+  visionExpiryTimer = null;
+  renderDetections([]);
+  setOverlayElementsVisible('[data-vision-overlay]', false);
 }
