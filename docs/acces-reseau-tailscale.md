@@ -36,7 +36,11 @@ appliquee sur `ens3` (service `tailscale-udp-gro.service`, persistant).
 `login.tailscale.com/admin/machines` -> `oscar-vps` -> Edit route settings ->
 Use as exit node.
 
-Utilisation depuis une machine sur un reseau bloquant :
+Le robot utilise desormais `oscar-vps` comme noeud de sortie permanent. Ce
+reglage Tailscale survit aux redemarrages et permet a WebRTC et NTP de passer
+meme lorsque le Wi-Fi ne laisse sortir que TCP/443.
+
+Utilisation depuis un poste operateur sur un reseau bloquant :
 
     tailscale up --exit-node=oscar-vps
     # pour revenir en direct :
@@ -46,13 +50,15 @@ Tout le trafic passe alors par le VPS, en empruntant le tunnel Tailscale qui
 traverse lui-meme le port 443. WebRTC redevient possible depuis l ecole, sans
 avoir a deployer un serveur TURN.
 
-## Piste a tester : stabilite DDS
+## Recuperation automatique apres changement de reseau
 
-Les noeuds ROS se lient a l interface reseau au demarrage. Quand le robot change
-de Wi-Fi, ils continuent d annoncer l ancienne adresse et cessent de se
-decouvrir : la camera devient invisible et `/cmd_vel` perd son publisher, sans
-qu aucun processus ne s arrete. Le contournement actuel est de relancer les
-conteneurs.
+`oscar-network-recovery.timer` controle toutes les 20 secondes l interface
+physique, la passerelle et l adresse IPv4 du robot. Les metriques de route et
+les interfaces virtuelles sont ignorees. Apres un changement, il attend le
+retour du DNS puis relance uniquement les agents LiveKit. Les moteurs, la
+camera et la pile ROS ne sont pas redemarres. Une fermeture bloquee est forcee
+apres 10 secondes.
 
-Si les noeuds sont lies a l interface Tailscale (adresse fixe), ce probleme
-devrait disparaitre. A verifier en fixant l interface DDS sur `tailscale0`.
+Les agents quittent aussi explicitement leur session lorsque LiveKit signale
+une deconnexion. Leurs fermetures sont bornees, afin que la supervision puisse
+toujours les relancer.
