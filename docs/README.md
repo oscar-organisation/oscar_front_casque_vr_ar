@@ -1,6 +1,6 @@
 # O.S.C.A.R.
 
-**Operational Support & Command-Assisted Robot**
+**Operating System & Control Architecture for Robotics**
 
 Système de réalité augmentée intelligent pour le retail, développé en partenariat avec MimicX AI.
 

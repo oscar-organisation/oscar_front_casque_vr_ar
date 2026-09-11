@@ -13,7 +13,10 @@ import { initXRInputMonitor } from '../hud/xrInputMonitor.js';
 import { initMicButton } from '../hud/micButton.js';
 import { initVRButton } from '../hud/vrButton.js';
 import { initXRScene, onStreamUpdate, getProjectionMode, getProjectionInfo } from '../immersive/xrScene.js';
+import { onXRStateChange } from '../immersive/xrScene.js';
+import { initDesktopInputPublisher, setDesktopInputSuspended } from '../teleoperation/desktopInputPublisher.js';
 import { throttle } from '../utils/throttle.js';
+import { FEATURES } from '../config/constants.js';
 
 let isRunning = false;
 let detectionsActive = false;
@@ -27,12 +30,17 @@ const processDetections = throttle(() => {
 export async function startApp() {
   setStatus('INIT');
   startClock();
-  startRobotTelemetry();
   startConnectionMetrics();
   initXRInputMonitor();
   initMicButton();
+  setOverlayElementsVisible('[data-mock-overlay]', FEATURES.MOCK_OVERLAYS);
+  setOverlayElementsVisible('[data-diagnostic-overlay]', FEATURES.DIAGNOSTIC_OVERLAYS);
+  document.body.classList.toggle('diagnostic-overlays-enabled', FEATURES.DIAGNOSTIC_OVERLAYS);
 
-  initOverlayEngine();
+  if (FEATURES.MOCK_OVERLAYS) {
+    startRobotTelemetry();
+    initOverlayEngine();
+  }
 
   const videoEl = document.getElementById('video-feed');
   const audioEl = document.getElementById('audio-feed');
@@ -40,6 +48,8 @@ export async function startApp() {
   // The immersive scene owns the 3D rendering (cinema plane / 360 sphere).
   // It uses videoEl as the texture source, so LiveKit keeps driving it.
   await initXRScene(videoEl);
+  initDesktopInputPublisher();
+  onXRStateChange(({ presenting }) => setDesktopInputSuspended(presenting));
   initVRButton();
 
   setStatus('CONNECTING');
@@ -56,7 +66,7 @@ export async function startApp() {
 
     if (state.connectionState === ConnectionState.Connected) {
       if (state.hasVideo) {
-        if (!detectionsActive) {
+        if (FEATURES.MOCK_OVERLAYS && !detectionsActive) {
           detectionsActive = true;
           setTimeout(() => setStatus('SCANNING'), 1500);
         }
@@ -94,9 +104,17 @@ function reflectProjectionInHud() {
 
 function loop() {
   if (!isRunning) return;
-  processDetections();
-  renderOverlay();
+  if (FEATURES.MOCK_OVERLAYS) {
+    processDetections();
+    renderOverlay();
+  }
   requestAnimationFrame(loop);
+}
+
+function setOverlayElementsVisible(selector, visible) {
+  document.querySelectorAll(selector).forEach((element) => {
+    element.hidden = !visible;
+  });
 }
 
 export function stopApp() {

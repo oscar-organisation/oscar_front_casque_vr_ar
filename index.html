@@ -20,23 +20,23 @@
     <div id="xr-container"></div>
 
     <!-- 2D overlay for detection boxes (orthographic, on top of the video) -->
-    <div id="three-container"></div>
+    <div id="three-container" data-mock-overlay></div>
 
     <div id="hud">
 
-      <span class="corner corner--tl"></span>
-      <span class="corner corner--tr"></span>
-      <span class="corner corner--bl"></span>
-      <span class="corner corner--br"></span>
+      <span class="corner corner--tl" data-diagnostic-overlay></span>
+      <span class="corner corner--tr" data-diagnostic-overlay></span>
+      <span class="corner corner--bl" data-diagnostic-overlay></span>
+      <span class="corner corner--br" data-diagnostic-overlay></span>
 
-      <div class="reticle">
+      <div class="reticle" data-mock-overlay>
         <span class="reticle__crosshair"></span>
         <span class="reticle__ring"></span>
       </div>
 
-      <div id="labels"></div>
+      <div id="labels" data-mock-overlay></div>
 
-      <header class="panel panel--tl">
+      <header class="panel panel--tl" data-diagnostic-overlay>
         <div class="panel__bar">
           <span class="panel__dot"></span>
           <span class="panel__title">OSCAR</span>
@@ -56,16 +56,16 @@
         </div>
       </header>
 
-      <header class="panel panel--tr">
+      <header class="panel panel--tr" data-diagnostic-overlay>
         <div class="panel__time" id="hud-time">--:--:--</div>
         <div class="panel__date" id="hud-date">— —</div>
-        <div class="panel__line">
+        <div class="panel__line" data-mock-overlay>
           <span class="k">DÉTECTIONS</span>
           <span class="v" id="detection-count">0</span>
         </div>
       </header>
 
-      <section class="panel panel--bl">
+      <section class="panel panel--bl" data-mock-overlay>
         <div class="panel__bar">
           <span class="panel__title">TÉLÉMÉTRIE ROBOT</span>
           <span class="panel__sub" id="telemetry-mode">TÉLÉOPÉRATION</span>
@@ -96,7 +96,7 @@
         </div>
       </section>
 
-      <section class="panel panel--br">
+      <section class="panel panel--br" data-diagnostic-overlay>
         <div class="panel__bar">
           <span class="panel__title">FLUX TEMPS RÉEL</span>
           <span class="panel__sub" id="metrics-state" data-conn-state="0">OFFLINE</span>
@@ -132,7 +132,7 @@
         </div>
       </section>
 
-      <section class="panel panel--teleop">
+      <section class="panel panel--teleop" data-diagnostic-overlay>
         <div class="panel__bar">
           <span class="panel__title">CONTRÔLES CASQUE</span>
           <span class="panel__sub" id="xr-input-state" data-xr-published="0">EN ATTENTE VR</span>
