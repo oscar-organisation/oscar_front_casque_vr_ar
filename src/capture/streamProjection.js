@@ -17,6 +17,13 @@ import { IMMERSIVE_VIDEO } from '../config/constants.js';
 const PROJECTION = Object.freeze({
   FLAT:     'flat',
   EQUIRECT: 'equirect',
+  FISHEYE:  'fisheye',   // VR180-style equidistant fisheye, per-eye
+});
+
+const LAYOUT = Object.freeze({
+  MONO:               'mono',
+  STEREO_LEFT_RIGHT:  'stereo-left-right',
+  STEREO_TOP_BOTTOM:  'stereo-top-bottom',
 });
 
 const PROJECTION_SOURCE = Object.freeze({
@@ -48,38 +55,70 @@ export function detectProjection({ metadata, trackName, width, height } = {}) {
  * @returns {{ mode: 'flat'|'equirect', source: string, reason: string, confidence: 'explicit'|'inferred'|'fallback' }}
  */
 export function detectProjectionDetails({ metadata, trackName, width, height } = {}) {
+  // Always parse layout from metadata when available — independent of projection.
+  const parsedMetadata = parseMetadata(metadata);
+  let layout = parsedMetadata?.layout && Object.values(LAYOUT).includes(parsedMetadata.layout)
+    ? parsedMetadata.layout
+    : LAYOUT.MONO;
+  if (layout === LAYOUT.MONO && trackName && /stereo/i.test(trackName)) {
+    layout = LAYOUT.STEREO_LEFT_RIGHT;
+  }
+
   // Debug/test override for headset validation with prerecorded LiveKit videos.
   if (shouldForceEquirect()) {
     return {
       mode: PROJECTION.EQUIRECT,
+      layout,
       source: PROJECTION_SOURCE.FORCED,
       reason: 'forced by ?force360=1 or VITE_FORCE_IMMERSIVE_360=true',
       confidence: 'explicit',
     };
   }
 
+  // The current Isaac publisher token still carries legacy `projection=flat`
+  // metadata. The dedicated track name is more specific than that stale token
+  // and must select the fisheye dome, otherwise WebXR shows the raw circular
+  // camera image on a flat screen in front of the operator.
+  if (trackName && /vr180|fisheye/i.test(trackName)) {
+    return {
+      mode: PROJECTION.FISHEYE,
+      layout: layout === LAYOUT.MONO ? LAYOUT.STEREO_LEFT_RIGHT : layout,
+      fovDeg: Number(parsedMetadata?.fovDeg) || 180,
+      source: PROJECTION_SOURCE.TRACK_NAME,
+      reason: `track name "${trackName}" indicates stereo fisheye VR180`,
+      confidence: 'explicit',
+    };
+  }
+
   // 1. Metadata is the source of truth
-  if (metadata) {
-    try {
-      const parsed = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
-      if (parsed?.projection === PROJECTION.EQUIRECT) {
-        return {
-          mode: PROJECTION.EQUIRECT,
-          source: PROJECTION_SOURCE.METADATA,
-          reason: 'participant metadata projection=equirect',
-          confidence: 'explicit',
-        };
-      }
-      if (parsed?.projection === PROJECTION.FLAT) {
-        return {
-          mode: PROJECTION.FLAT,
-          source: PROJECTION_SOURCE.METADATA,
-          reason: 'participant metadata projection=flat',
-          confidence: 'explicit',
-        };
-      }
-    } catch (_) {
-      // Ignore malformed JSON, fall through to heuristics
+  if (parsedMetadata) {
+    if (parsedMetadata.projection === PROJECTION.FISHEYE) {
+      return {
+        mode: PROJECTION.FISHEYE,
+        layout,
+        fovDeg: Number(parsedMetadata.fovDeg) || 180,
+        source: PROJECTION_SOURCE.METADATA,
+        reason: `participant metadata projection=fisheye (${parsedMetadata.fovDeg || 180}°/eye)`,
+        confidence: 'explicit',
+      };
+    }
+    if (parsedMetadata.projection === PROJECTION.EQUIRECT) {
+      return {
+        mode: PROJECTION.EQUIRECT,
+        layout,
+        source: PROJECTION_SOURCE.METADATA,
+        reason: 'participant metadata projection=equirect',
+        confidence: 'explicit',
+      };
+    }
+    if (parsedMetadata.projection === PROJECTION.FLAT) {
+      return {
+        mode: PROJECTION.FLAT,
+        layout,
+        source: PROJECTION_SOURCE.METADATA,
+        reason: `participant metadata projection=flat${layout !== LAYOUT.MONO ? `, layout=${layout}` : ''}`,
+        confidence: 'explicit',
+      };
     }
   }
 
@@ -87,18 +126,32 @@ export function detectProjectionDetails({ metadata, trackName, width, height } =
   if (trackName && /360|equirect|pano/i.test(trackName)) {
     return {
       mode: PROJECTION.EQUIRECT,
+      layout,
       source: PROJECTION_SOURCE.TRACK_NAME,
       reason: `track name "${trackName}" indicates 360 video`,
       confidence: 'inferred',
     };
   }
+  if (trackName && /stereo/i.test(trackName) && layout === LAYOUT.STEREO_LEFT_RIGHT && !parsedMetadata) {
+    // Inferred stereo from track name when metadata is silent.
+    return {
+      mode: PROJECTION.FLAT,
+      layout: LAYOUT.STEREO_LEFT_RIGHT,
+      source: PROJECTION_SOURCE.TRACK_NAME,
+      reason: `track name "${trackName}" hints stereo, defaulting to side-by-side`,
+      confidence: 'inferred',
+    };
+  }
 
-  // 3. Aspect-ratio heuristic — equirect frames are 2:1 by definition
+  // 3. Aspect-ratio heuristic — equirect frames are 2:1 by definition.
+  // Stereo side-by-side is also 2:1, so we only flip to equirect when metadata
+  // explicitly says mono — otherwise a stereo flat feed would be misclassified.
   if (width && height) {
     const ratio = width / height;
-    if (ratio >= 1.85 && ratio <= 2.15) {
+    if (ratio >= 1.85 && ratio <= 2.15 && layout === LAYOUT.MONO) {
       return {
         mode: PROJECTION.EQUIRECT,
+        layout,
         source: PROJECTION_SOURCE.ASPECT_RATIO,
         reason: `video ratio ${ratio.toFixed(3)} is close to 2:1`,
         confidence: 'inferred',
@@ -108,10 +161,20 @@ export function detectProjectionDetails({ metadata, trackName, width, height } =
 
   return {
     mode: PROJECTION.FLAT,
+    layout,
     source: PROJECTION_SOURCE.FALLBACK,
     reason: 'no equirect metadata, track hint, or 2:1 ratio',
     confidence: 'fallback',
   };
+}
+
+function parseMetadata(metadata) {
+  if (!metadata) return null;
+  try {
+    return typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+  } catch (_) {
+    return null;
+  }
 }
 
 export function shouldForceEquirect() {
@@ -126,4 +189,4 @@ export function shouldRequireEquirectInVR() {
   return IMMERSIVE_VIDEO.REQUIRE_EQUIRECT_IN_VR || params.get('require360') === '1';
 }
 
-export { PROJECTION, PROJECTION_SOURCE };
+export { PROJECTION, LAYOUT, PROJECTION_SOURCE };

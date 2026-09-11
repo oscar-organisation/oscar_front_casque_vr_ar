@@ -142,6 +142,12 @@ body.xr-active #hud {
 #vr-button:disabled { opacity: 0.5; cursor: wait; }
 #vr-button[hidden] { display: none; }
 
+[data-mock-overlay][hidden],
+[data-diagnostic-overlay][hidden] { display: none !important; }
+
+body:not(.diagnostic-overlays-enabled) #hud::before,
+body:not(.diagnostic-overlays-enabled) #hud::after { display: none; }
+
 #hud {
   position: absolute;
   inset: 0;

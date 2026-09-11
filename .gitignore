@@ -14,3 +14,17 @@ Exemple*.jpg
 Exemple*.png
 .vercel
 .env*
+.livekit-generated/
+
+# Modules désormais maintenus dans les dépôts dédiés de l'organisation OSCAR.
+edge/
+sim/
+All-context-process/
+scripts/
+
+# Artefacts locaux et anciennes captures de travail.
+.venv*/
+backup-*/
+*.docx
+*.tar.gz
+__pycache__/
