@@ -27,6 +27,7 @@ let audioElRef = null;
 const dataEncoder = new TextEncoder();
 
 const listeners = new Set();
+const dataListeners = new Map();
 const ATTACHED = { videoTrackSid: null, videoIdentity: null, audioTrackSid: null };
 
 const state = {
@@ -67,6 +68,12 @@ export function onStateChange(cb) {
 
 export function getState() {
   return { ...state };
+}
+
+export function onDataPacket(topic, callback) {
+  if (!dataListeners.has(topic)) dataListeners.set(topic, new Set());
+  dataListeners.get(topic).add(callback);
+  return () => dataListeners.get(topic)?.delete(callback);
 }
 
 function notify() {
@@ -298,6 +305,17 @@ function attachRoomEvents() {
       attachBestVideo();
       attachAudioIfAny();
     })
+    .on(RoomEvent.DataReceived, (...args) => {
+      const packet = decodeDataEvent(args);
+      if (!packet?.topic) return;
+      for (const callback of dataListeners.get(packet.topic) || []) {
+        try {
+          callback(packet.payload, packet.participantIdentity);
+        } catch (err) {
+          console.warn(`[LiveKit] invalid data packet on topic "${packet.topic}"`, err);
+        }
+      }
+    })
     .on(RoomEvent.Disconnected, () => {
       state.hasVideo = false;
       state.hasAudio = false;
@@ -305,6 +323,22 @@ function attachRoomEvents() {
       state.connectionState = ConnectionState.Disconnected;
       notify();
     });
+}
+
+function decodeDataEvent(args) {
+  const first = args[0];
+  if (first && typeof first === 'object' && 'payload' in first) {
+    return {
+      payload: first.payload,
+      topic: first.topic,
+      participantIdentity: first.participant?.identity || null,
+    };
+  }
+  return {
+    payload: first,
+    participantIdentity: args[1]?.identity || null,
+    topic: args[3] || null,
+  };
 }
 
 /* ════════════════════════════════════════════════════════════

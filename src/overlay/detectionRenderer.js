@@ -6,6 +6,13 @@ import { setInfoPanel, clearInfoPanels } from '../hud/infoPanel.js';
 import { OVERLAY } from '../config/constants.js';
 import { renderXRDetections, clearXRDetections } from '../immersive/xrScene.js';
 
+function detectionColor(type) {
+  if (type === 'incident') return OVERLAY.INCIDENT_COLOR;
+  if (type === 'person' || type === 'face') return OVERLAY.PERSON_COLOR;
+  if (type === 'product') return OVERLAY.PRODUCT_COLOR;
+  return OVERLAY.DEFAULT_COLOR;
+}
+
 /**
  * Processes a batch of detections: bounding boxes, labels, and info panels.
  * Clears previous frame before rendering.
@@ -17,7 +24,7 @@ export function renderDetections(detections) {
   clearInfoPanels();
 
   detections.forEach((detection) => {
-    const color = detection.type === 'face' ? OVERLAY.FACE_COLOR : OVERLAY.PRODUCT_COLOR;
+    const color = detectionColor(detection.type);
 
     createBoundingBox(
       detection.id,
@@ -30,7 +37,7 @@ export function renderDetections(detections) {
     );
 
     setLabel(detection);
-    setInfoPanel(detection);
+    if (detection.meta?.showPanel) setInfoPanel(detection);
   });
 
   renderXRDetections(detections);
@@ -39,7 +46,7 @@ export function renderDetections(detections) {
 
 /** Renders a single detection without clearing others */
 export function renderSingleDetection(detection) {
-  const color = detection.type === 'face' ? OVERLAY.FACE_COLOR : OVERLAY.PRODUCT_COLOR;
+  const color = detectionColor(detection.type);
 
   createBoundingBox(
     detection.id,
@@ -52,7 +59,7 @@ export function renderSingleDetection(detection) {
   );
 
   setLabel(detection);
-  setInfoPanel(detection);
+  if (detection.meta?.showPanel) setInfoPanel(detection);
   renderXRDetections([detection]);
 }
 
