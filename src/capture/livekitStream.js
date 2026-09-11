@@ -40,6 +40,15 @@ const state = {
   bitrateBps: 0,
   fps: 0,
   packetsLost: 0,
+  jitterBufferMs: 0,
+  jitterBufferTargetMs: 0,
+  processingDelayMs: 0,
+  roundTripTimeMs: 0,
+  framesDropped: 0,
+  nackCount: 0,
+  pliCount: 0,
+  availableIncomingBitrateBps: 0,
+  transportProtocol: null,
   roomName: LIVEKIT.ROOM,
   serverUrl: LIVEKIT.URL,
   participantIdentity: null,
@@ -70,10 +79,15 @@ function notify() {
    ════════════════════════════════════════════════════════════ */
 
 /** Higher score = preferred for display. */
-function publisherPriority(identity) {
+function publisherPriority(identity, metadata, trackName) {
   if (!identity) return 0;
-  if (identity.startsWith('simulateur-robot-')) return 100; // live operator script
-  if (identity.startsWith('robot-')) return 50;             // generic robot
+  if (identity === LIVEKIT.PREFERRED_PUBLISHER) return 1000; // physical ROSMASTER, or URL override
+  const source = parseMetadata(metadata)?.source || '';
+  if (/rosmaster|physical/i.test(source)) return 950;        // physical fleet robot
+  if (/camera-front/i.test(trackName || '')) return 900;     // canonical physical camera track
+  if (identity === LIVEKIT.ROOM_PUBLISHER) return 800;       // room-associated simulator/robot
+  if (identity.startsWith('simulateur-robot-')) return 700;  // legacy Isaac identity
+  if (identity.startsWith('robot-')) return 500;             // another fleet robot
   if (identity.includes('media-simulator')) return 10;      // VPS MP4 fallback
   return 30;
 }
@@ -86,7 +100,8 @@ function pickPreferredVideo() {
   for (const participant of room.remoteParticipants.values()) {
     for (const pub of participant.trackPublications.values()) {
       if (pub.kind !== Track.Kind.Video || !pub.track) continue;
-      const score = publisherPriority(participant.identity);
+      const trackName = pub.trackName ?? pub.track?.name ?? '';
+      const score = publisherPriority(participant.identity, participant.metadata, trackName);
       if (score > bestScore) {
         bestScore = score;
         best = { publication: pub, participant };
@@ -94,6 +109,15 @@ function pickPreferredVideo() {
     }
   }
   return best;
+}
+
+function parseMetadata(metadata) {
+  if (!metadata) return null;
+  try {
+    return JSON.parse(metadata);
+  } catch (_) {
+    return null;
+  }
 }
 
 function pickAnyAudio() {
@@ -135,6 +159,7 @@ function attachBestVideo() {
   }
 
   pick.publication.track.attach(videoElRef);
+  configureLowLatencyPlayout(pick.publication.track);
   ATTACHED.videoTrackSid = pick.publication.trackSid;
   ATTACHED.videoIdentity = pick.participant.identity;
 
@@ -151,6 +176,20 @@ function attachBestVideo() {
     `[LiveKit] attached track from ${pick.participant.identity} — metadata=${pick.participant.metadata || '(none)'} track=${state.activeTrackName} dims=${state.videoWidth}×${state.videoHeight}`
   );
   notify();
+}
+
+function configureLowLatencyPlayout(track) {
+  try {
+    // LiveKit maps this to RTCRtpReceiver.playoutDelayHint where supported.
+    // Zero asks the browser not to add an artificial playout delay.
+    track.setPlayoutDelay?.(0);
+    const receiver = track.receiver;
+    if (receiver && 'jitterBufferTarget' in receiver) {
+      receiver.jitterBufferTarget = 0;
+    }
+  } catch (err) {
+    console.debug('[LiveKit] low-latency playout hint unavailable', err);
+  }
 }
 
 function attachAudioIfAny() {
@@ -364,6 +403,7 @@ function encodePayload(payload) {
    ════════════════════════════════════════════════════════════ */
 
 let metricsTimer = null;
+let metricsTicks = 0;
 function startMetricsLoop() {
   clearInterval(metricsTimer);
   metricsTimer = setInterval(async () => {
@@ -373,6 +413,15 @@ function startMetricsLoop() {
       let totalBitrate = 0;
       let fps = 0;
       let packetsLost = 0;
+      let jitterBufferMs = 0;
+      let jitterBufferTargetMs = 0;
+      let processingDelayMs = 0;
+      let roundTripTimeMs = 0;
+      let framesDropped = 0;
+      let nackCount = 0;
+      let pliCount = 0;
+      let availableIncomingBitrateBps = 0;
+      let transportProtocol = null;
 
       for (const participant of room.remoteParticipants.values()) {
         for (const pub of participant.trackPublications.values()) {
@@ -380,6 +429,8 @@ function startMetricsLoop() {
           if (pub.trackSid !== ATTACHED.videoTrackSid) continue;
           const stats = await pub.track.getRTCStatsReport?.();
           if (!stats) continue;
+          let selectedPair = null;
+          let transport = null;
           stats.forEach((report) => {
             if (report.type === 'inbound-rtp' && report.kind === 'video') {
               if (report.bytesReceived && pub.track._lastBytes) {
@@ -391,16 +442,76 @@ function startMetricsLoop() {
               pub.track._lastTs = report.timestamp;
               if (report.framesPerSecond) fps = report.framesPerSecond;
               if (report.packetsLost != null) packetsLost = report.packetsLost;
+              framesDropped = report.framesDropped ?? 0;
+              nackCount = report.nackCount ?? 0;
+              pliCount = report.pliCount ?? 0;
+              if (report.jitterBufferEmittedCount > 0) {
+                jitterBufferMs = 1000 * report.jitterBufferDelay / report.jitterBufferEmittedCount;
+                jitterBufferTargetMs = 1000
+                  * (report.jitterBufferTargetDelay ?? 0)
+                  / report.jitterBufferEmittedCount;
+              }
+              if (report.framesDecoded > 0) {
+                processingDelayMs = 1000
+                  * (report.totalProcessingDelay ?? 0)
+                  / report.framesDecoded;
+              }
             }
+            if (report.type === 'transport' && report.selectedCandidatePairId) transport = report;
           });
+
+          if (transport) selectedPair = stats.get(transport.selectedCandidatePairId);
+          if (!selectedPair) {
+            stats.forEach((report) => {
+              if (
+                report.type === 'candidate-pair'
+                && report.state === 'succeeded'
+                && (report.selected || report.nominated)
+              ) selectedPair = report;
+            });
+          }
+          if (selectedPair) {
+            roundTripTimeMs = 1000 * (selectedPair.currentRoundTripTime ?? 0);
+            availableIncomingBitrateBps = selectedPair.availableIncomingBitrate ?? 0;
+            const local = stats.get(selectedPair.localCandidateId);
+            const remote = stats.get(selectedPair.remoteCandidateId);
+            const protocol = local?.protocol || remote?.protocol || null;
+            transportProtocol = protocol
+              ? `${protocol}/${local?.candidateType || remote?.candidateType || 'unknown'}`
+              : null;
+          }
         }
       }
 
       state.bitrateBps = totalBitrate;
       state.fps = fps;
       state.packetsLost = packetsLost;
+      state.jitterBufferMs = jitterBufferMs;
+      state.jitterBufferTargetMs = jitterBufferTargetMs;
+      state.processingDelayMs = processingDelayMs;
+      state.roundTripTimeMs = roundTripTimeMs;
+      state.framesDropped = framesDropped;
+      state.nackCount = nackCount;
+      state.pliCount = pliCount;
+      state.availableIncomingBitrateBps = availableIncomingBitrateBps;
+      state.transportProtocol = transportProtocol;
       state.participantsCount = room.numParticipants;
       notify();
+
+      metricsTicks += 1;
+      if (metricsTicks % 5 === 0 && state.hasVideo) {
+        console.info('[LiveKit][latency]', {
+          publisher: state.activePublisher,
+          fps: Number(fps.toFixed(1)),
+          bitrateKbps: Math.round(totalBitrate / 1000),
+          jitterBufferMs: Number(jitterBufferMs.toFixed(1)),
+          processingDelayMs: Number(processingDelayMs.toFixed(1)),
+          rttMs: Number(roundTripTimeMs.toFixed(1)),
+          packetsLost,
+          framesDropped,
+          transport: transportProtocol,
+        });
+      }
     } catch (e) {
       // best effort
     }

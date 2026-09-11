@@ -16,11 +16,16 @@ import * as THREE from 'three';
 import {
   detectProjectionDetails,
   PROJECTION,
+  LAYOUT,
   shouldForceEquirect,
   shouldRequireEquirectInVR,
 } from '../capture/streamProjection.js';
+
+const EYE_LAYER_LEFT = 1;
+const EYE_LAYER_RIGHT = 2;
 import { onXRInputPacket, publishXRInputFrame } from '../teleoperation/xrInputPublisher.js';
 import { setStatus } from '../hud/statusManager.js';
+import { FEATURES } from '../config/constants.js';
 
 const CONTAINER_ID = 'xr-container';
 const VIEWER_HEIGHT = 1.6;
@@ -47,6 +52,7 @@ let xrInputPanelCtx = null;
 let xrInputPanelTexture = null;
 let lastXRInputPanelDraw = 0;
 let currentMode = null;
+let currentLayout = LAYOUT.MONO;
 let currentProjection = null;
 let vrSupported = false;
 let lastLiveKitState = null;
@@ -72,8 +78,10 @@ export async function initXRScene(sourceVideoEl) {
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(0, VIEWER_HEIGHT, 0);
   scene.add(camera);
-  initXRInputDebugPanel();
-  onXRInputPacket(updateXRInputDebugPanel);
+  if (FEATURES.DIAGNOSTIC_OVERLAYS) {
+    initXRInputDebugPanel();
+    onXRInputPacket(updateXRInputDebugPanel);
+  }
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -95,14 +103,16 @@ export async function initXRScene(sourceVideoEl) {
   videoEl.addEventListener('loadedmetadata', () => {
     console.info(`[XR] video loadedmetadata: ${videoEl.videoWidth}×${videoEl.videoHeight}`);
     if (lastLiveKitState) {
-      const mode = detectModeFromState(lastLiveKitState);
-      if (mode !== currentMode) buildForMode(mode);
+      const detected = detectModeFromState(lastLiveKitState);
+      currentLayout = detected.layout;
+      buildForMode(detected.mode);
     }
   });
   videoEl.addEventListener('resize', () => {
     if (lastLiveKitState) {
-      const mode = detectModeFromState(lastLiveKitState);
-      if (mode !== currentMode) buildForMode(mode);
+      const detected = detectModeFromState(lastLiveKitState);
+      currentLayout = detected.layout;
+      buildForMode(detected.mode);
     }
   });
 
@@ -111,9 +121,13 @@ export async function initXRScene(sourceVideoEl) {
   renderer.xr.addEventListener('sessionstart', () => {
     container.classList.add('xr-active');
     document.body.classList.add('xr-active');
-    forceSphereForImmersiveSession();
+    enablePerEyeLayers();
+    // Rebuild because stereo uses a dedicated per-eye geometry in WebXR.
+    // The publisher metadata remains authoritative: a mono flat camera must
+    // stay on a cinema screen instead of being stretched over a 360° sphere.
+    buildForMode(currentMode);
     showXRDetections(true);
-    showXRInputDebugPanel(true);
+    showXRInputDebugPanel(FEATURES.DIAGNOSTIC_OVERLAYS);
     notify({ presenting: true });
   });
   renderer.xr.addEventListener('sessionend', () => {
@@ -146,12 +160,16 @@ export async function initXRScene(sourceVideoEl) {
   notify({ supported: vrSupported, presenting: false });
 }
 
-/** React to LiveKit state changes — swaps mesh if projection mode changes. */
+/** React to LiveKit state changes — swaps mesh if projection or layout changes. */
 export function onStreamUpdate(liveKitState) {
   if (!scene) return;
   lastLiveKitState = liveKitState;
-  const mode = renderer?.xr?.isPresenting ? PROJECTION.EQUIRECT : detectModeFromState(liveKitState);
-  if (mode !== currentMode) buildForMode(mode);
+  const detected = detectModeFromState(liveKitState);
+  const mode = detected.mode;
+  if (mode !== currentMode || detected.layout !== currentLayout) {
+    currentLayout = detected.layout;
+    buildForMode(mode);
+  }
 }
 
 /** Called by the HUD button. */
@@ -161,14 +179,16 @@ export async function enterVR() {
     return;
   }
   if (renderer.xr.isPresenting) return;
-  if (shouldRequireEquirectInVR() && currentMode !== PROJECTION.EQUIRECT) {
+  // Stereo flat is an acceptable immersive mode — only block when the user
+  // explicitly opts into the strict 360 contract AND the feed is mono flat.
+  if (shouldRequireEquirectInVR() && currentMode !== PROJECTION.EQUIRECT && currentLayout === LAYOUT.MONO) {
     setStatus('ERROR_NON_IMMERSIVE');
     const reason = currentProjection?.reason || 'flux non déclaré comme 360';
     alert(`Flux non immersif : vidéo 360 requise.\n\nRaison : ${reason}`);
     return;
   }
   try {
-    forceSphereForImmersiveSession();
+    buildForMode(currentMode);
     const session = await navigator.xr.requestSession('immersive-vr', {
       optionalFeatures: ['local-floor', 'bounded-floor'],
     });
@@ -243,10 +263,12 @@ function detectModeFromState(liveKitState) {
     height: liveKitState.videoHeight || videoEl?.videoHeight || 0,
   });
 
-  console.info(`[XR] projection detected → ${projection.mode} (${projection.source}: ${projection.reason})`);
+  console.info(
+    `[XR] projection detected → ${projection.mode} / ${projection.layout} (${projection.source}: ${projection.reason})`
+  );
   currentProjection = projection;
   notify({ projection });
-  return projection.mode;
+  return projection;
 }
 
 function buildForMode(mode) {
@@ -255,15 +277,42 @@ function buildForMode(mode) {
   if (!currentProjection || currentProjection.mode !== mode) {
     currentProjection = {
       mode,
+      layout: currentLayout,
       source: shouldForceEquirect() ? 'forced' : 'initial',
       reason: shouldForceEquirect() ? 'forced by test override' : 'initial render mode before stream metadata',
       confidence: shouldForceEquirect() ? 'explicit' : 'fallback',
     };
   }
-  displayMesh = mode === PROJECTION.EQUIRECT ? buildSphere() : buildCinemaScreen();
+
+  // Stereo content in immersive mode: render a WORLD-LOCKED forward window.
+  // The robot has 2 fixed forward cameras — there is no 360 data to wrap on a
+  // sphere, and gluing the image to the head (head-lock) drags the whole world
+  // when you move. Instead we anchor the stereo image in space in front of the
+  // viewer: turning/lifting the head lets you look around it, the image stays
+  // put. This is the honest model for "looking through the robot's eyes".
+  const isStereo = currentLayout === LAYOUT.STEREO_LEFT_RIGHT
+                || currentLayout === LAYOUT.STEREO_TOP_BOTTOM;
+  if (isStereo && renderer?.xr?.isPresenting) {
+    // Fisheye (VR180-style) → per-eye spherical cap: head rotation samples the
+    // wide captured field. Pinhole → angular-exact flat window.
+    displayMesh = mode === PROJECTION.FISHEYE
+      ? buildStereoFisheyeDome(currentLayout, currentProjection?.fovDeg || 160)
+      : buildStereoWorldWindow(currentLayout);
+    displayMesh.userData.projection = mode;
+    displayMesh.userData.layout = currentLayout;
+    scene.add(displayMesh);   // world-locked, NOT parented to the camera
+    console.info(`[XR] projection → stereo ${mode === PROJECTION.FISHEYE ? 'fisheye dome' : 'world-locked window'} (${currentLayout})`);
+    notify({ projection: currentProjection });
+    return;
+  }
+
+  displayMesh = mode === PROJECTION.EQUIRECT
+    ? (currentLayout === LAYOUT.MONO ? buildSphere() : buildStereoSphere(currentLayout))
+    : (currentLayout === LAYOUT.MONO ? buildCinemaScreen() : buildStereoCinemaScreen(currentLayout));
   displayMesh.userData.projection = mode;
+  displayMesh.userData.layout = currentLayout;
   scene.add(displayMesh);
-  console.info(`[XR] projection → ${mode}`);
+  console.info(`[XR] projection → ${mode} / ${currentLayout}`);
   notify({ projection: currentProjection });
 }
 
@@ -275,6 +324,153 @@ function removeCurrentMesh() {
     if (child.material) child.material.dispose();
   });
   displayMesh = null;
+}
+
+/**
+ * Stereo world-locked window — two co-located curved surfaces fixed in the
+ * virtual world in front of the viewer, each visible to one eye via WebXR
+ * layers. Head movement looks AROUND the window (it stays anchored), instead
+ * of dragging the image. This is the right model for fixed robot cameras:
+ * a forward "porthole" anchored in space, not a 360 sphere (no data for the
+ * sides) and not head-locked goggles (drags the world).
+ */
+function buildStereoWorldWindow(layout) {
+  const group = new THREE.Group();
+  group.add(buildWorldWindowEye(layout, /*isLeft*/ true,  EYE_LAYER_LEFT));
+  group.add(buildWorldWindowEye(layout, /*isLeft*/ false, EYE_LAYER_RIGHT));
+  return group;
+}
+
+/**
+ * Stereo fisheye dome (VR180 pattern) — one spherical cap per eye, both
+ * co-located and world-locked. The equidistant fisheye model maps an image
+ * point at normalized radius r (0..1) to a ray at angle θ = r·θmax from the
+ * camera axis; we invert that per vertex: a dome vertex at angle θ, azimuth φ
+ * samples the texture at (0.5 + 0.5·(θ/θmax)·cosφ, 0.5 + 0.5·(θ/θmax)·sinφ)
+ * inside its eye's half of the packed frame. Head rotation then reveals
+ * already-captured content — the NimbRo/VR180 telepresence design.
+ */
+function buildStereoFisheyeDome(layout, fovDeg) {
+  const group = new THREE.Group();
+  group.add(buildFisheyeDomeEye(layout, /*isLeft*/ true,  EYE_LAYER_LEFT,  fovDeg));
+  group.add(buildFisheyeDomeEye(layout, /*isLeft*/ false, EYE_LAYER_RIGHT, fovDeg));
+  group.position.set(0, VIEWER_HEIGHT, 0);
+  return group;
+}
+
+function buildFisheyeDomeEye(layout, isLeft, layer, fovDeg) {
+  const RADIUS = 20;
+  const thetaMax = THREE.MathUtils.degToRad(fovDeg / 2);
+  const SEG_T = 48;   // rings from centre to rim
+  const SEG_P = 96;   // segments around
+
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const isLR = layout === LAYOUT.STEREO_LEFT_RIGHT;
+
+  for (let it = 0; it <= SEG_T; it++) {
+    const theta = (thetaMax * it) / SEG_T;
+    const rn = it / SEG_T; // normalized image radius (equidistant: rn = θ/θmax)
+    for (let ip = 0; ip <= SEG_P; ip++) {
+      const phi = (2 * Math.PI * ip) / SEG_P;
+      // Forward is -Z; x right, y up.
+      const st = Math.sin(theta);
+      positions.push(
+        RADIUS * st * Math.cos(phi),
+        RADIUS * st * Math.sin(phi),
+        -RADIUS * Math.cos(theta)
+      );
+      let u = 0.5 + 0.5 * rn * Math.cos(phi);
+      let v = 0.5 + 0.5 * rn * Math.sin(phi);
+      if (isLR) {
+        u = (isLeft ? 0.0 : 0.5) + u * 0.5;
+      } else {
+        v = (isLeft ? 0.5 : 0.0) + v * 0.5;
+      }
+      uvs.push(u, v);
+    }
+  }
+  const row = SEG_P + 1;
+  for (let it = 0; it < SEG_T; it++) {
+    for (let ip = 0; ip < SEG_P; ip++) {
+      const a = it * row + ip;
+      const b = a + row;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+
+  const material = new THREE.MeshBasicMaterial({
+    map: videoTexture,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.layers.set(layer);
+  return mesh;
+}
+
+/**
+ * Robot camera intrinsics — must match the publisher rig (focal 2.0 mm,
+ * aperture 5.71 mm, 1280×720 per eye). The publisher may override via
+ * metadata.frame.hfovDeg / vfovDeg without redeploying the front.
+ */
+const CAPTURE_FALLBACK = { hfovDeg: 110, vfovDeg: 77.6 };
+
+function captureFovDeg() {
+  try {
+    const meta = lastLiveKitState?.activePublisherMetadata;
+    const parsed = typeof meta === 'string' ? JSON.parse(meta) : meta;
+    const frame = parsed?.frame;
+    if (frame?.hfovDeg && frame?.vfovDeg) {
+      return { hfovDeg: frame.hfovDeg, vfovDeg: frame.vfovDeg };
+    }
+  } catch (_) { /* fall through */ }
+  return CAPTURE_FALLBACK;
+}
+
+function buildWorldWindowEye(layout, isLeft, layer) {
+  // Angular-exact pinhole reprojection: a pinhole image maps geometrically
+  // onto a FLAT plane subtending exactly the capture frustum from the eye.
+  // Every pixel is then seen at the same angle it was captured — correct
+  // scale, straight lines stay straight, true robot-POV feel. (A curved
+  // screen bends straight lines and breaks the angular match; see NimbRo
+  // ANA Avatar XPRIZE telepresence papers for the same design rule.)
+  const DISTANCE = 1.5;
+  const { hfovDeg, vfovDeg } = captureFovDeg();
+  const WIDTH = 2 * DISTANCE * Math.tan(THREE.MathUtils.degToRad(hfovDeg / 2));
+  const HEIGHT = 2 * DISTANCE * Math.tan(THREE.MathUtils.degToRad(vfovDeg / 2));
+
+  const geometry = new THREE.PlaneGeometry(WIDTH, HEIGHT);
+
+  // Split the packed frame: left eye samples one half, right eye the other.
+  const uvs = geometry.attributes.uv;
+  const isLR = layout === LAYOUT.STEREO_LEFT_RIGHT;
+  for (let i = 0; i < uvs.count; i++) {
+    const u = uvs.getX(i);
+    const v = uvs.getY(i);
+    if (isLR) {
+      uvs.setX(i, (isLeft ? 0.0 : 0.5) + u * 0.5);
+    } else {
+      uvs.setY(i, (isLeft ? 0.5 : 0.0) + v * 0.5);
+    }
+  }
+  uvs.needsUpdate = true;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: videoTexture,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(0, VIEWER_HEIGHT, -DISTANCE);
+  mesh.layers.set(layer);
+  return mesh;
 }
 
 function buildSphere() {
@@ -291,11 +487,144 @@ function buildSphere() {
   return mesh;
 }
 
+/**
+ * Stereo cinema screen — two curved planes co-located in space, one visible
+ * to the left eye, the other to the right. Each plane has its own UV
+ * mapping so it samples a different half of the side-by-side video frame.
+ * Single VideoTexture, single decode — the magic happens via WebXR layers.
+ */
+function buildStereoCinemaScreen(layout) {
+  const group = new THREE.Group();
+  group.add(buildCurvedEye(layout, /*isLeft*/ true,  EYE_LAYER_LEFT));
+  group.add(buildCurvedEye(layout, /*isLeft*/ false, EYE_LAYER_RIGHT));
+  // Backdrop visible to both eyes (no layer override).
+  group.add(buildCinemaBackdrop());
+  return group;
+}
+
+function buildCurvedEye(layout, isLeft, layer) {
+  const SCREEN_WIDTH = 5.0;
+  const SCREEN_HEIGHT = SCREEN_WIDTH * (9 / 16);
+  const DISTANCE = 3.2;
+  const CURVE_SEGMENTS = 48;
+  const CURVE_RADIUS = 4.5;
+  const ARC = SCREEN_WIDTH / CURVE_RADIUS;
+
+  const geometry = new THREE.PlaneGeometry(SCREEN_WIDTH, SCREEN_HEIGHT, CURVE_SEGMENTS, 1);
+  const positions = geometry.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i);
+    const angle = (x / SCREEN_WIDTH) * ARC;
+    positions.setX(i, Math.sin(angle) * CURVE_RADIUS);
+    positions.setZ(i, -CURVE_RADIUS * Math.cos(angle) + CURVE_RADIUS);
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+
+  // Remap UVs so each eye samples the correct half of the packed frame.
+  const uvs = geometry.attributes.uv;
+  const isLR = layout === LAYOUT.STEREO_LEFT_RIGHT;
+  for (let i = 0; i < uvs.count; i++) {
+    const u = uvs.getX(i);
+    const v = uvs.getY(i);
+    if (isLR) {
+      uvs.setX(i, (isLeft ? 0.0 : 0.5) + u * 0.5);
+    } else {
+      // STEREO_TOP_BOTTOM — left eye = top half, right eye = bottom half.
+      uvs.setY(i, (isLeft ? 0.5 : 0.0) + v * 0.5);
+    }
+  }
+  uvs.needsUpdate = true;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: videoTexture,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  const screen = new THREE.Mesh(geometry, material);
+  screen.position.set(0, 1.6, -DISTANCE);
+  screen.layers.set(layer);
+  return screen;
+}
+
+function buildCinemaBackdrop() {
+  const SCREEN_WIDTH = 5.0;
+  const SCREEN_HEIGHT = SCREEN_WIDTH * (9 / 16);
+  const DISTANCE = 3.2;
+  const backdropGeo = new THREE.PlaneGeometry(SCREEN_WIDTH * 3, SCREEN_HEIGHT * 3);
+  const backdropMat = new THREE.MeshBasicMaterial({
+    color: 0x0a1218,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85,
+  });
+  const backdrop = new THREE.Mesh(backdropGeo, backdropMat);
+  backdrop.position.set(0, 1.6, -DISTANCE - 0.8);
+  return backdrop;
+}
+
+/**
+ * Stereo equirect sphere — two co-located inverted spheres, each sampling
+ * its half of the packed equirect frame.
+ */
+function buildStereoSphere(layout) {
+  const group = new THREE.Group();
+  group.add(buildSphereEye(layout, /*isLeft*/ true,  EYE_LAYER_LEFT));
+  group.add(buildSphereEye(layout, /*isLeft*/ false, EYE_LAYER_RIGHT));
+  group.position.set(0, VIEWER_HEIGHT, 0);
+  group.rotation.y = Math.PI;
+  return group;
+}
+
+function buildSphereEye(layout, isLeft, layer) {
+  const geometry = new THREE.SphereGeometry(VIDEO_SPHERE_RADIUS, 64, 40);
+  geometry.scale(-1, 1, 1);
+  const uvs = geometry.attributes.uv;
+  const isLR = layout === LAYOUT.STEREO_LEFT_RIGHT;
+  for (let i = 0; i < uvs.count; i++) {
+    const u = uvs.getX(i);
+    const v = uvs.getY(i);
+    if (isLR) {
+      uvs.setX(i, (isLeft ? 0.0 : 0.5) + u * 0.5);
+    } else {
+      uvs.setY(i, (isLeft ? 0.5 : 0.0) + v * 0.5);
+    }
+  }
+  uvs.needsUpdate = true;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: videoTexture,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.layers.set(layer);
+  return mesh;
+}
+
+/**
+ * In immersive mode, Three.js exposes a per-eye ArrayCamera. Enabling layers
+ * 1 (left) and 2 (right) on the right sub-cameras is what makes stereo work
+ * via the layer-per-mesh trick used in buildStereoCinemaScreen.
+ */
+function enablePerEyeLayers() {
+  const xrCamera = renderer.xr.getCamera?.();
+  if (!xrCamera?.cameras?.length) return;
+  // Enable mono content (layer 0) on both eyes — keeps HUD panels visible.
+  xrCamera.layers.enable(EYE_LAYER_LEFT);
+  xrCamera.layers.enable(EYE_LAYER_RIGHT);
+  if (xrCamera.cameras[0]) xrCamera.cameras[0].layers.enable(EYE_LAYER_LEFT);
+  if (xrCamera.cameras[1]) xrCamera.cameras[1].layers.enable(EYE_LAYER_RIGHT);
+}
+
 function buildCinemaScreen() {
   const group = new THREE.Group();
 
   const SCREEN_WIDTH = 5.0;
-  const SCREEN_HEIGHT = SCREEN_WIDTH * (9 / 16);
+  const videoAspect = videoEl?.videoWidth && videoEl?.videoHeight
+    ? videoEl.videoWidth / videoEl.videoHeight
+    : 16 / 9;
+  const SCREEN_HEIGHT = SCREEN_WIDTH / Math.max(1, Math.min(2.4, videoAspect));
   const DISTANCE = 3.2;
   const CURVE_SEGMENTS = 48;
   const CURVE_RADIUS = 4.5;
@@ -343,20 +672,8 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function forceSphereForImmersiveSession() {
-  if (currentMode === PROJECTION.EQUIRECT && displayMesh?.userData?.projection === PROJECTION.EQUIRECT) return;
-  currentProjection = {
-    mode: PROJECTION.EQUIRECT,
-    source: 'forced',
-    reason: 'immersive VR sessions always use spherical wrap',
-    confidence: 'explicit',
-  };
-  buildForMode(PROJECTION.EQUIRECT);
-}
-
 function showXRDetections(visible) {
-  const group = getOrCreateDetectionGroup();
-  group.visible = visible;
+  if (detectionGroup) detectionGroup.visible = visible;
 }
 
 function getOrCreateDetectionGroup() {

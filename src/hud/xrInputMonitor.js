@@ -42,7 +42,8 @@ function renderSnapshot(snapshot) {
   const left = findController(summary.controllers, 'left');
   const right = findController(summary.controllers, 'right');
 
-  setText('state', snapshot.published ? 'TRANSMIS' : 'NON CONNECTÉ');
+  const source = formatSource(summary.source);
+  setText('state', snapshot.published ? `TRANSMIS · ${source}` : 'NON CONNECTÉ');
   els.state?.setAttribute('data-xr-published', snapshot.published ? '1' : '0');
   setText('topic', snapshot.topic);
   setText('seq', `#${summary.seq}`);
@@ -53,6 +54,13 @@ function renderSnapshot(snapshot) {
   setText('leftButtons', formatButtons(left?.buttons));
   setText('rightAxes', formatAxes(right?.axes));
   setText('rightButtons', formatButtons(right?.buttons));
+}
+
+function formatSource(source) {
+  if (source === 'desktop-gamepad') return 'MANETTE';
+  if (source === 'desktop-keyboard') return 'CLAVIER';
+  if (source === 'desktop-release') return 'ARRÊT';
+  return 'CASQUE';
 }
 
 function findController(controllers, hand) {
