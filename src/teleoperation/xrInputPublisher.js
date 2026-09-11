@@ -41,11 +41,7 @@ export function publishXRInputFrame(timestamp, frame, referenceSpace) {
   const payload = buildXRInputPayload(timestamp, frame, referenceSpace);
   if (!payload) return false;
 
-  const published = publishDataPacket(TELEOPERATION.XR_INPUT_TOPIC, payload, {
-    reliable: false,
-  });
-  emitSnapshot(payload, published);
-  return published;
+  return publishInputPayload(payload);
 }
 
 /**
@@ -58,11 +54,38 @@ export function buildXRInputPayload(timestamp, frame, referenceSpace) {
   return {
     v: 1,
     type: 'xr-input',
+    source: 'webxr',
     seq: sequence++,
     t: round(timestamp),
+    sentAtMs: Date.now(),
     head: viewerPose ? transformToPacket(viewerPose.transform) : null,
     controllers: readControllers(frame, referenceSpace),
   };
+}
+
+/**
+ * Publishes keyboard/gamepad controllers using the same wire contract as WebXR.
+ * Keeping one packet shape lets Isaac retain a single safety and mapping path.
+ */
+export function publishDesktopInput(controllers, source, timestamp = performance.now()) {
+  return publishInputPayload({
+    v: 1,
+    type: 'xr-input',
+    source,
+    seq: sequence++,
+    t: round(timestamp),
+    sentAtMs: Date.now(),
+    head: null,
+    controllers,
+  });
+}
+
+function publishInputPayload(payload) {
+  const published = publishDataPacket(TELEOPERATION.XR_INPUT_TOPIC, payload, {
+    reliable: false,
+  });
+  emitSnapshot(payload, published);
+  return published;
 }
 
 function readControllers(frame, referenceSpace) {
@@ -130,6 +153,7 @@ function emitSnapshot(payload, published) {
 
 function summarizePayload(payload) {
   return {
+    source: payload.source || 'webxr',
     seq: payload.seq,
     time: payload.t,
     head: summarizeTransform(payload.head),

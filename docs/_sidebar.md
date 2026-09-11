@@ -3,6 +3,7 @@
 - [Architecture](architecture.md)
 - [Pipeline immersion 360](immersive-video-pipeline.md)
 - [Téléopération XR LiveKit](xr-teleoperation-livekit.md)
+- [Simulation Isaac Sim](isaac-sim-system-validation.md)
 - [User Stories](user-stories.md)
 - [API Reference](api-reference.md)
 - [Guide de développement](dev-guide.md)
