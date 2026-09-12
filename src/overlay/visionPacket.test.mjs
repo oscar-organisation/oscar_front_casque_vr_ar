@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseVisionPacket } from './visionPacket.js';
+import { parseVisionPacket, parseVisionPacketDetaille } from './visionPacket.js';
 
 test('maps normalized worker boxes to a covered video viewport', () => {
   const packet = new TextEncoder().encode(JSON.stringify({
@@ -17,4 +17,22 @@ test('maps normalized worker boxes to a covered video viewport', () => {
 
 test('rejects unknown packet schemas', () => {
   assert.throws(() => parseVisionPacket(JSON.stringify({ schema: 'other', detections: [] }), { width: 1, height: 1 }));
+});
+
+test('un paquet conserve l identite du modele emetteur', () => {
+  const paquet = {
+    schema: 'oscar.vision.overlay.v1',
+    model_id: 'modele-a',
+    model_name: 'Sol sale',
+    task: 'incident_detection',
+    frame_width: 640,
+    frame_height: 480,
+    detections: [{ detection_id: 'd1', label: 'dirty_floor', confidence: 0.8,
+                   x: 0.1, y: 0.1, width: 0.2, height: 0.2 }],
+  };
+  const { modelId, detections } = parseVisionPacketDetaille(
+    JSON.stringify(paquet), { width: 1280, height: 720 },
+  );
+  assert.equal(modelId, 'modele-a');
+  assert.equal(detections.length, 1);
 });

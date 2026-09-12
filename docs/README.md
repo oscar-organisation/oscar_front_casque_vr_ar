@@ -17,8 +17,8 @@ OSCAR est un système AR qui, à travers un casque VR/AR, permet de :
 
 | Couche | Technologies |
 |:-------|:-------------|
-| Capture | WebRTC `getUserMedia`, WebSocket (headset) |
-| Intelligence | MimicX Biometrix, Emoticore, Darwin, MobileNet |
+| Capture | WebRTC `getUserMedia`, piste vidéo LiveKit du robot |
+| Intelligence | Worker de perception externe, Ultralytics, contrat `oscar.vision.overlay.v1` |
 | Rendu | Three.js, WebGL, DOM HUD |
 | Build | Vite |
 | Déploiement | distribute.app |

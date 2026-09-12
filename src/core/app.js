@@ -5,7 +5,7 @@ import { onDataPacket, onStateChange, ConnectionState } from '../capture/livekit
 import { initOverlayEngine, render as renderOverlay } from '../overlay/overlayEngine.js';
 import { renderDetections } from '../overlay/detectionRenderer.js';
 import { generateMockDetections } from '../services/mockDetection.js';
-import { parseVisionPacket } from '../overlay/visionPacket.js';
+import { parseVisionPacketDetaille } from '../overlay/visionPacket.js';
 import { setStatus } from '../hud/statusManager.js';
 import { startClock } from '../hud/clockModule.js';
 import { startRobotTelemetry } from '../hud/robotTelemetry.js';
@@ -48,13 +48,39 @@ export async function startApp() {
   }
 
   if (FEATURES.VISION_OVERLAYS) {
+    /* Une Model Box fait tourner plusieurs modèles, et chacun publie ses propres
+       paquets. Rendre le dernier paquet reçu revenait donc à effacer les boîtes
+       d'un modèle chaque fois qu'un autre ne trouvait rien : avec deux modèles à
+       5 images/s dont un souvent vide, l'overlay disparaissait cinq fois par
+       seconde. On garde le dernier état de chaque modèle et on affiche l'union,
+       chaque flux expirant pour son propre compte. */
+    const fluxParModele = new Map();
+
+    const fusionner = () => {
+      const limite = Date.now() - VISION.STALE_AFTER_MS;
+      const toutes = [];
+      for (const [modelId, flux] of fluxParModele) {
+        if (flux.recuA < limite) {
+          fluxParModele.delete(modelId);
+          continue;
+        }
+        toutes.push(...flux.detections);
+      }
+      setOverlayElementsVisible('[data-vision-overlay]', toutes.length > 0);
+      renderDetections(toutes);
+    };
+
     onDataPacket(VISION.OVERLAY_TOPIC, (payload) => {
       try {
-        const detections = parseVisionPacket(payload);
+        const { modelId, detections } = parseVisionPacketDetaille(payload);
+        fluxParModele.set(modelId, { detections, recuA: Date.now() });
         clearTimeout(visionExpiryTimer);
-        setOverlayElementsVisible('[data-vision-overlay]', detections.length > 0);
-        renderDetections(detections);
-        visionExpiryTimer = setTimeout(clearVisionOverlays, VISION.STALE_AFTER_MS);
+        fusionner();
+        // Repasse après expiration pour retirer un flux devenu muet.
+        visionExpiryTimer = setTimeout(() => {
+          fusionner();
+          if (fluxParModele.size === 0) clearVisionOverlays();
+        }, VISION.STALE_AFTER_MS + 50);
       } catch (error) {
         console.warn('[Vision] Invalid overlay packet ignored', error);
       }

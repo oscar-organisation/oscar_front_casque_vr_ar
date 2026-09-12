@@ -31,8 +31,10 @@ src/
 │   └── labelRenderer.js      # Labels 2D positionnés sur les détections
 ├── teleoperation/
 │   └── xrInputPublisher.js   # Casque/contrôleurs WebXR → LiveKit Data
+├── overlay/
+│   └── visionPacket.js       # Contrat oscar.vision.overlay.v1 reçu du worker
 ├── services/
-│   ├── mimicxClient.js       # Client API MimicX (Biometrix, Darwin)
+│   ├── mimicxClient.js       # Hérité, plus importé par aucun module
 │   └── mockDetection.js      # Détections simulées (développement local)
 ├── utils/
 │   ├── throttle.js           # Limitation de fréquence d'appels

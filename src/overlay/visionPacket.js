@@ -13,6 +13,25 @@ function detectionType(label, task) {
   return 'product';
 }
 
+/**
+ * Parses one overlay packet, keeping the emitting model's identity.
+ *
+ * Each model in a Model Box publishes its own packets, so the model id is what
+ * lets the caller merge several streams instead of letting the newest packet
+ * speak for all of them.
+ */
+export function parseVisionPacketDetaille(raw, viewport = {}) {
+  const text = typeof raw === 'string' ? raw : decoder.decode(raw);
+  const packet = JSON.parse(text);
+  if (packet.schema !== VISION.SCHEMA || !Array.isArray(packet.detections)) {
+    throw new TypeError('Contrat overlay OSCAR non reconnu');
+  }
+  return {
+    modelId: String(packet.model_id || packet.model_name || 'inconnu'),
+    detections: parseVisionPacket(raw, viewport),
+  };
+}
+
 export function parseVisionPacket(raw, viewport = {}) {
   const text = typeof raw === 'string' ? raw : decoder.decode(raw);
   const packet = JSON.parse(text);
