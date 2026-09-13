@@ -17,13 +17,8 @@ export const OVERLAY = {
   FACE_COLOR: 0x9bb8a4,
   PRODUCT_COLOR: 0xd85810,
   INCIDENT_COLOR: 0xd98072,
-  // Sur un sol clair, un remplissage a 3,5 % et un trait de 1 px disparaissaient.
-  FILL_OPACITY: 0.14,
-  // Epaisseurs en pixels ecran. WebGL ignore `linewidth` : les traits sont donc
-  // construits en quadrilateres, seule facon d'obtenir une vraie epaisseur.
-  BORDER_WIDTH: 3,
-  CORNER_WIDTH: 6,
-  BORDER_OPACITY: 0.92,
+  FILL_OPACITY: 0.035,
+  BORDER_WIDTH: 1,
   Z_DEPTH: 500,
 };
 

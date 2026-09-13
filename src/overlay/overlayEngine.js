@@ -64,39 +64,31 @@ export function createBoundingBox(id, x, y, width, height, label = '', color = O
 
   const geometry = new THREE.PlaneGeometry(width, height);
 
+  // Quiet corner guides keep the target readable without boxing the image in.
   const halfW = width / 2;
   const halfH = height / 2;
+  const cornerX = Math.min(28, Math.max(10, width * 0.16));
+  const cornerY = Math.min(28, Math.max(10, height * 0.16));
+  const vertices = new Float32Array([
+    -halfW, halfH, 0, -halfW + cornerX, halfH, 0,
+    -halfW, halfH, 0, -halfW, halfH - cornerY, 0,
+    halfW, halfH, 0, halfW - cornerX, halfH, 0,
+    halfW, halfH, 0, halfW, halfH - cornerY, 0,
+    -halfW, -halfH, 0, -halfW + cornerX, -halfH, 0,
+    -halfW, -halfH, 0, -halfW, -halfH + cornerY, 0,
+    halfW, -halfH, 0, halfW - cornerX, -halfH, 0,
+    halfW, -halfH, 0, halfW, -halfH + cornerY, 0,
+  ]);
+  const guideGeometry = new THREE.BufferGeometry();
+  guideGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  const guides = new THREE.LineSegments(
+    guideGeometry,
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.78 })
+  );
+  guides.position.z = 0.5;
+  group.add(guides);
 
-  // Un trait = un quadrilatere. LineBasicMaterial plafonne a 1 px sur presque
-  // tous les navigateurs, ce qui rendait les boites illisibles sur sol clair.
-  const trait = (w, h, x, y, opacity) => {
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(Math.max(1, w), Math.max(1, h)),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity })
-    );
-    mesh.position.set(x, y, 0.5);
-    group.add(mesh);
-  };
-
-  // Contour complet : on voit toute l'emprise de l'objet, pas seulement ses angles.
-  const t = OVERLAY.BORDER_WIDTH;
-  trait(width, t, 0, halfH - t / 2, OVERLAY.BORDER_OPACITY);
-  trait(width, t, 0, -halfH + t / 2, OVERLAY.BORDER_OPACITY);
-  trait(t, height, -halfW + t / 2, 0, OVERLAY.BORDER_OPACITY);
-  trait(t, height, halfW - t / 2, 0, OVERLAY.BORDER_OPACITY);
-
-  // Accents d'angle plus epais : ils accrochent l'oeil meme sur une petite boite.
-  const tc = OVERLAY.CORNER_WIDTH;
-  const lx = Math.min(34, Math.max(12, width * 0.22));
-  const ly = Math.min(34, Math.max(12, height * 0.22));
-  for (const sx of [-1, 1]) {
-    for (const sy of [-1, 1]) {
-      trait(lx, tc, sx * (halfW - lx / 2), sy * (halfH - tc / 2), 1);
-      trait(tc, ly, sx * (halfW - tc / 2), sy * (halfH - ly / 2), 1);
-    }
-  }
-
-  // Remplissage
+  // Semi-transparent fill
   const fill = new THREE.Mesh(
     geometry,
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: OVERLAY.FILL_OPACITY })
