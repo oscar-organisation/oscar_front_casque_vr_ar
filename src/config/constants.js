@@ -97,6 +97,10 @@ export const VISION = {
   // 1200 ms, une boite restait affichee plus d'une seconde apres que la camera
   // eut quitte l'objet. 600 ms couvre trois cycles d'inference a 5 images/s.
   STALE_AFTER_MS: 600,
+  // Au-dela, les boites sont dessinees sans etiquette individuelle. Un modele de
+  // rayon produit ~80 produits par image : autant d'etiquettes recouvraient
+  // les rayons et ne se lisaient plus. Les boites seules restent lisibles.
+  MAX_LABELS: 12,
 };
 
 export const IMMERSIVE_VIDEO = {

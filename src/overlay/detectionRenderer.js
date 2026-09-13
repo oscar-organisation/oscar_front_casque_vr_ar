@@ -3,7 +3,7 @@
 import { createBoundingBox, removeBoundingBox, clearOverlays } from './overlayEngine.js';
 import { setLabel, clearLabels, updateDetectionCount } from '../hud/labelRenderer.js';
 import { setInfoPanel, clearInfoPanels } from '../hud/infoPanel.js';
-import { OVERLAY } from '../config/constants.js';
+import { OVERLAY, VISION } from '../config/constants.js';
 import { renderXRDetections, clearXRDetections } from '../immersive/xrScene.js';
 
 function detectionColor(type) {
@@ -23,6 +23,8 @@ export function renderDetections(detections) {
   clearLabels();
   clearInfoPanels();
 
+  const avecEtiquettes = detections.length <= VISION.MAX_LABELS;
+
   detections.forEach((detection) => {
     const color = detectionColor(detection.type);
 
@@ -36,7 +38,7 @@ export function renderDetections(detections) {
       color
     );
 
-    setLabel(detection);
+    if (avecEtiquettes) setLabel(detection);
     if (detection.meta?.showPanel) setInfoPanel(detection);
   });
 
