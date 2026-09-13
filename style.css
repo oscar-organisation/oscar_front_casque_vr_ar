@@ -492,13 +492,15 @@ body:not(.diagnostic-overlays-enabled) #hud::after { display: none; }
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  min-height: 28px;
-  background: rgba(18, 20, 22, 0.54);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  min-height: 30px;
+  /* Un fond a 54 % laissait transparaitre le sol clair : le libelle se lisait
+     mal justement la ou les objets au sol apparaissent. */
+  background: rgba(10, 12, 14, 0.86);
+  border: 1.5px solid var(--detection-accent, rgba(255, 255, 255, 0.32));
   border-radius: 7px;
-  padding: 5px 9px 5px 8px;
+  padding: 5px 10px 5px 9px;
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0;
   white-space: nowrap;
   backdrop-filter: blur(14px) saturate(118%);
@@ -506,8 +508,8 @@ body:not(.diagnostic-overlays-enabled) #hud::after { display: none; }
   box-shadow: 0 7px 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .detection-label__tag::before {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--detection-accent, rgba(255, 255, 255, 0.72));
   content: "";
@@ -519,9 +521,10 @@ body:not(.diagnostic-overlays-enabled) #hud::after { display: none; }
 .detection-label__tag--object { --detection-accent: #e7e3dc; }
 .detection-label__name { color: rgba(255, 255, 255, 0.94); font-weight: 600; }
 .detection-label__confidence {
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--detection-accent, rgba(255, 255, 255, 0.78));
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 .info-panel {
