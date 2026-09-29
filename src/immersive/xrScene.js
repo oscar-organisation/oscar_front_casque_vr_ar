@@ -145,6 +145,7 @@ export async function initXRScene(sourceVideoEl) {
     if (frame && referenceSpace) {
       publishXRInputFrame(timestamp, frame, referenceSpace);
     }
+    if (frame) surveillerSortieManette(frame.session, timestamp);
 
     renderer.render(scene, camera);
   });
@@ -196,6 +197,55 @@ export async function enterVR() {
   } catch (err) {
     console.error('[XR] enterVR failed:', err);
     alert("Impossible d'activer la VR : " + (err?.message || err));
+  }
+}
+
+/**
+ * Quitte la session immersive et rend la main a la page plate.
+ *
+ * Il n'existait aucune sortie : le bouton du HUD ne savait qu'entrer, et une
+ * fois le casque sur la tete la seule issue etait le menu systeme du casque.
+ */
+export async function exitVR() {
+  const session = renderer?.xr?.getSession?.();
+  if (!session) return;
+  try {
+    await session.end();
+  } catch (err) {
+    console.error('[XR] exitVR failed:', err);
+  }
+}
+
+/** Duree de maintien des deux poignees qui declenche la sortie. */
+const MAINTIEN_SORTIE_MS = 1500;
+/** Index de la poignee dans la disposition « xr-standard ». */
+const BOUTON_POIGNEE = 1;
+let debutMaintienSortie = 0;
+
+/**
+ * Sortie de secours a la manette, faute de HUD visible en immersion.
+ *
+ * Les deux poignees serrees ensemble pendant une seconde et demie : il faut
+ * les deux mains et une intention tenue, ce qu'on ne fait pas par megarde en
+ * pilotant, puisque le pilotage passe par les joysticks et les gachettes.
+ */
+function surveillerSortieManette(session, timestamp) {
+  if (!session) return;
+  let poigneesSerrees = 0;
+  for (const input of session.inputSources) {
+    if (input.gamepad?.buttons?.[BOUTON_POIGNEE]?.pressed) poigneesSerrees += 1;
+  }
+  if (poigneesSerrees < 2) {
+    debutMaintienSortie = 0;
+    return;
+  }
+  if (!debutMaintienSortie) {
+    debutMaintienSortie = timestamp;
+    return;
+  }
+  if (timestamp - debutMaintienSortie >= MAINTIEN_SORTIE_MS) {
+    debutMaintienSortie = 0;
+    void exitVR();
   }
 }
 

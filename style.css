@@ -110,7 +110,8 @@ body.xr-active #hud {
 }
 
 /* VR toggle button — same pill style as the mic */
-#vr-button {
+#vr-button,
+#exit-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -141,6 +142,20 @@ body.xr-active #hud {
 }
 #vr-button:disabled { opacity: 0.5; cursor: wait; }
 #vr-button[hidden] { display: none; }
+
+/* La sortie se tient en retrait : on la cherche quand on en a besoin, elle ne
+   se dispute pas l'attention avec le micro ni avec l'entree en VR. */
+#exit-button {
+  color: var(--c-text-dim);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+#exit-button:hover {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(248, 113, 113, 0.18);
+  transform: translateY(-1px);
+}
+#exit-button:active { transform: translateY(0); }
 
 [data-mock-overlay][hidden],
 [data-vision-overlay][hidden],

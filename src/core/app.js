@@ -13,6 +13,7 @@ import { startConnectionMetrics } from '../hud/connectionMetrics.js';
 import { initXRInputMonitor } from '../hud/xrInputMonitor.js';
 import { initMicButton } from '../hud/micButton.js';
 import { initVRButton } from '../hud/vrButton.js';
+import { initExitButton } from '../hud/exitButton.js';
 import { initXRScene, onStreamUpdate, getProjectionMode, getProjectionInfo } from '../immersive/xrScene.js';
 import { onXRStateChange } from '../immersive/xrScene.js';
 import { initDesktopInputPublisher, setDesktopInputSuspended } from '../teleoperation/desktopInputPublisher.js';
@@ -96,6 +97,7 @@ export async function startApp() {
   initDesktopInputPublisher();
   onXRStateChange(({ presenting }) => setDesktopInputSuspended(presenting));
   initVRButton();
+  initExitButton();
 
   setStatus('CONNECTING');
   const { video } = await initCaptureSource(videoEl, audioEl);
